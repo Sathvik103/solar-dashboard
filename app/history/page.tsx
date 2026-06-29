@@ -1,10 +1,12 @@
 import {Table, TableBody, TableCell, TableHeader, TableRow , TableHead} from "@/components/ui/table";
 import { generateHistoryData } from "@/lib/solarData";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import PageWrapper from "@/components/PageWrapper";
 
 export default function HistoryPage() {
   const historyData = generateHistoryData();
   return (
+    <PageWrapper>
     <div className="p-8 max-w-2xl mx-auto">
       <Card>
         <CardHeader>
@@ -32,6 +34,7 @@ export default function HistoryPage() {
         </CardContent>
       </Card>
     </div>
+    </PageWrapper>
   )
 }
 
