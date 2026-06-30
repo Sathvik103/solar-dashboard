@@ -6,7 +6,7 @@ import { usePathname } from 'next/navigation'
 export default function Navbar() {
     const pathname = usePathname() // tells you the current route
   return (
-    <nav className="flex items-center justify-between p-4 bg-zinc-100 dark:bg-zinc-900">
+    <nav className="flex items-center justify-between px-8 py-4 border-b bg-card">
       <Link href="/" className="text-xl font-bold">
         Solar Dashboard
       </Link>
