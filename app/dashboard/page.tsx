@@ -15,7 +15,7 @@ export default async function DashboardPage() {
   const data = generateDashboardData()
 
   return (
-    <PageWrapper title="Dashboard" description="Live solar panel monitoring dashboard">
+    <PageWrapper>
   
 
       <div className="flex items-center justify-between">
