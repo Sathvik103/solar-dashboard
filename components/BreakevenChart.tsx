@@ -44,7 +44,7 @@ export default function BreakevenChart({ numberOfPanels, dailySunlightHours, ele
             />
             <ReferenceLine y={0} stroke="#6b7280" strokeDasharray="4 4" label="Breakeven" />
             <Tooltip
-              formatter={(value: number) => [`₹${value.toLocaleString()}`, '']}
+              formatter={(value) => [`₹${Number(value).toLocaleString()}`, '']}
               labelFormatter={(label) => `Month ${label}`}
             />
             <Legend />
