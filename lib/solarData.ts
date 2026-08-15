@@ -1,3 +1,34 @@
+/**
+ * MOCK DATA — Phase 1 static demo only.
+ *
+ * This file contains hard-coded, randomly generated solar data for the
+ * prototype dashboard. It is NOT a source of truth and will NOT be used
+ * for any real user calculations.
+ *
+ * Real per-user data will come from:
+ *   - public.solar_profiles  (Phase 2+)
+ *   - knowledge base / documents table (Phase 3+)
+ *
+ * Tariff values (DEMO_TARIFF_INR_PER_KWH, DEMO_NET_METERING_RATE_INR) are
+ * interim hard-coded constants specific to the Hyderabad / TSSPDCL demo.
+ * They will be replaced by authoritative knowledge-base data in Phase 3.
+ * Do NOT use these values as inputs to real financial calculations.
+ */
+
+// ---------------------------------------------------------------------------
+// Demo tariff constants — Hyderabad / TSSPDCL (interim, NOT authoritative)
+// ---------------------------------------------------------------------------
+
+/** Demo electricity tariff: ₹8/kWh (TSSPDCL residential slab — approximate) */
+export const DEMO_TARIFF_INR_PER_KWH = 8
+
+/** Demo net metering buyback rate: ₹3.5/unit (TSSPDCL govt rate — approximate) */
+export const DEMO_NET_METERING_RATE_INR = 3.5
+
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
+
 export type HourlyOutput = {
   hour: string
   output: number
@@ -55,7 +86,7 @@ export function generateDashboardData(): DashboardData {
 
   if (excessOrDeficit > 2) {
     gridStatus = 'selling'
-    netMeteringEarnings = parseFloat((excessOrDeficit * 3.5).toFixed(2))
+    netMeteringEarnings = parseFloat((excessOrDeficit * DEMO_NET_METERING_RATE_INR).toFixed(2))
   } else if (excessOrDeficit < -2) {
     gridStatus = 'buying'
     gridUnitsDrawn = parseFloat(Math.abs(excessOrDeficit).toFixed(2))
@@ -66,7 +97,7 @@ export function generateDashboardData(): DashboardData {
   return {
     currentOutput: parseFloat((3.2 + Math.random() * 0.5).toFixed(2)),
     todayTotal,
-    moneySavedToday: parseFloat((todayTotal * 8).toFixed(2)),
+    moneySavedToday: parseFloat((todayTotal * DEMO_TARIFF_INR_PER_KWH).toFixed(2)),
     hourlyData,
     gridStatus,
     netMeteringEarnings,
