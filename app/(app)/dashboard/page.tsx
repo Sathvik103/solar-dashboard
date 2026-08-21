@@ -1,138 +1,251 @@
-// Server Component — no 'use client' directive.
-// motion imports are handled inside AnimatedCard.tsx and PageWrapper.tsx (both 'use client').
-
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 import { generateDashboardData } from '@/lib/solarData'
 import OutputChart from '@/components/charts/OutputChart'
 import { AnimatedCard, AnimatedContainer } from '@/components/AnimatedCard'
 import PageWrapper from '@/components/layout/PageWrapper'
 import { requireUser } from '@/lib/dal/users'
-
-function GridStatusBadge({ status }: { status: string }) {
-  if (status === 'selling') return <Badge className="bg-green-500">Selling to Grid</Badge>
-  if (status === 'buying') return <Badge className="bg-red-500">Buying from Grid</Badge>
-  return <Badge className="bg-blue-500">Self Reliant</Badge>
-}
+import { getSolarProfile } from '@/lib/dal/solar-profiles'
+import { calculateOptimalSystemSize } from '@/lib/calculations/systemSizing'
+import Link from 'next/link'
+import {
+  Sun,
+  Zap,
+  TrendingUp,
+  IndianRupee,
+  Leaf,
+  Sparkles,
+  Sliders,
+  ArrowRight,
+  BookOpen,
+  ShieldCheck,
+} from 'lucide-react'
 
 export default async function DashboardPage() {
-  await requireUser()
+  const user = await requireUser()
+  const profile = await getSolarProfile(user.id)
   const data = generateDashboardData()
+
+  const monthlyUnits = profile?.monthlyUnitsKwh || 350
+  const roofArea = profile?.roofAreaSqft || 800
+  const sizing = calculateOptimalSystemSize({
+    monthlyUnitsKwh: monthlyUnits,
+    monthlyBillInr: profile?.monthlyBillInr || 2800,
+    roofAreaSqft: roofArea,
+  })
 
   return (
     <PageWrapper>
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Live Monitor</h1>
-        <GridStatusBadge status={data.gridStatus} />
+      {/* Welcome Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight text-foreground flex items-center gap-2">
+            <span>Solar Intelligence Dashboard</span>
+            <Badge className="bg-emerald-600 font-mono text-xs">
+              {profile?.city || 'Hyderabad'}, Telangana
+            </Badge>
+          </h1>
+          <p className="text-xs text-muted-foreground mt-1">
+            Real-time monitoring, deterministic generation telemetry, and agentic solar planning.
+          </p>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <Link href="/analysis">
+            <Button size="sm" variant="outline" className="text-xs gap-1.5 h-8">
+              <Sliders className="h-3.5 w-3.5 text-emerald-600" />
+              <span>Solar Studio</span>
+            </Button>
+          </Link>
+          <Link href="/chat">
+            <Button size="sm" className="text-xs gap-1.5 h-8 bg-emerald-600 hover:bg-emerald-700 text-white">
+              <Sparkles className="h-3.5 w-3.5 text-amber-300" />
+              <span>Ask Solar Agent</span>
+            </Button>
+          </Link>
+        </div>
       </div>
 
-      <AnimatedContainer className="grid grid-cols-3 gap-4">
+      {/* AI Recommendation Banner */}
+      <Card className="border-emerald-500/30 bg-gradient-to-r from-emerald-950/30 via-emerald-900/10 to-transparent">
+        <CardContent className="p-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+          <div className="flex items-start gap-3">
+            <div className="h-10 w-10 rounded-xl bg-emerald-500/20 text-emerald-500 flex items-center justify-center shrink-0 border border-emerald-500/30">
+              <Sparkles className="h-5 w-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="font-bold text-sm text-foreground">
+                  Personalized Recommendation: {sizing.recommendedCapacityKw} kW System
+                </span>
+                <Badge variant="outline" className="text-[10px] bg-emerald-50 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
+                  PM Surya Ghar Subsidy: ₹{sizing.subsidyAmountInr.toLocaleString()}
+                </Badge>
+              </div>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Based on your {monthlyUnits} kWh/month consumption, a {sizing.recommendedCapacityKw} kW installation saves ~₹{sizing.estimatedAnnualSavingsInr.toLocaleString()}/yr with a payback of {sizing.paybackPeriodYears} years.
+              </p>
+            </div>
+          </div>
+          <Link href="/analysis">
+            <Button size="sm" variant="secondary" className="text-xs gap-1 shrink-0 h-8 font-medium">
+              <span>View Full Proposal</span>
+              <ArrowRight className="h-3 w-3" />
+            </Button>
+          </Link>
+        </CardContent>
+      </Card>
+
+      {/* Primary KPI Metrics */}
+      <AnimatedContainer className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <AnimatedCard>
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-sm text-muted-foreground">Current Output</CardTitle>
+          <Card className="hover:border-emerald-500/40 transition-colors">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-xs text-muted-foreground font-medium flex items-center justify-between">
+                <span>Current Real-time Power</span>
+                <Zap className="h-4 w-4 text-amber-500" />
+              </CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-3xl font-bold">{data.currentOutput.toFixed(2)}</p>
-              <p className="text-sm text-muted-foreground">kW</p>
+              <div className="text-2xl font-black text-foreground">
+                {data.currentOutput.toFixed(2)} <span className="text-sm font-normal text-muted-foreground">kW</span>
+              </div>
+              <span className="text-xs text-emerald-600 font-medium mt-1 block">
+                Peak irradiance: 4.8 kWh/m²/day
+              </span>
             </CardContent>
           </Card>
         </AnimatedCard>
 
         <AnimatedCard>
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-sm text-muted-foreground">Today's Generation</CardTitle>
+          <Card className="hover:border-emerald-500/40 transition-colors">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-xs text-muted-foreground font-medium flex items-center justify-between">
+                <span>Today's Generation</span>
+                <Sun className="h-4 w-4 text-amber-500" />
+              </CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-3xl font-bold">{data.todayTotal.toFixed(2)}</p>
-              <p className="text-sm text-muted-foreground">kWh</p>
+              <div className="text-2xl font-black text-foreground">
+                {data.todayTotal.toFixed(2)} <span className="text-sm font-normal text-muted-foreground">kWh</span>
+              </div>
+              <span className="text-xs text-muted-foreground mt-1 block">
+                Monthly Yield: ~{sizing.estimatedMonthlyGenerationKwh} kWh
+              </span>
             </CardContent>
           </Card>
         </AnimatedCard>
 
         <AnimatedCard>
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-sm text-muted-foreground">Money Saved Today</CardTitle>
+          <Card className="hover:border-emerald-500/40 transition-colors">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-xs text-muted-foreground font-medium flex items-center justify-between">
+                <span>Money Saved Today</span>
+                <IndianRupee className="h-4 w-4 text-emerald-600" />
+              </CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-3xl font-bold text-green-600">₹{data.moneySavedToday.toFixed(2)}</p>
-              <p className="text-sm text-muted-foreground">@ ₹8/kWh (demo)</p>
+              <div className="text-2xl font-black text-emerald-600 dark:text-emerald-400">
+                ₹{data.moneySavedToday.toFixed(2)}
+              </div>
+              <span className="text-xs text-muted-foreground mt-1 block">
+                Annual Est: ₹{sizing.estimatedAnnualSavingsInr.toLocaleString()}
+              </span>
+            </CardContent>
+          </Card>
+        </AnimatedCard>
+
+        <AnimatedCard>
+          <Card className="hover:border-emerald-500/40 transition-colors">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-xs text-muted-foreground font-medium flex items-center justify-between">
+                <span>Carbon Reduction</span>
+                <Leaf className="h-4 w-4 text-emerald-600" />
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-black text-foreground">
+                {sizing.annualCo2AvoidedKg.toLocaleString()} <span className="text-sm font-normal text-muted-foreground">kg CO2</span>
+              </div>
+              <span className="text-xs text-emerald-600 font-medium mt-1 block">
+                Equivalent to {sizing.treesEquivalentPlanted} trees planted
+              </span>
             </CardContent>
           </Card>
         </AnimatedCard>
       </AnimatedContainer>
 
-      <AnimatedContainer className="grid grid-cols-2 gap-4">
-        <AnimatedCard>
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-sm text-muted-foreground">Monthly Projection</CardTitle>
-            </CardHeader>
-            <CardContent className="flex flex-col gap-1">
-              <div className="flex justify-between">
-                <span className="text-sm text-muted-foreground">Projected</span>
-                <span className="font-semibold">{data.projectedMonthly} kWh</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-sm text-muted-foreground">Actual so far</span>
-                <span className="font-semibold">{data.actualMonthly} kWh</span>
-              </div>
-              <div className="flex justify-between mt-2">
-                <span className="text-sm text-muted-foreground">Predicted sun hours next month</span>
-                <span className="font-semibold">{data.predictedSunHoursNextMonth} hrs/day</span>
-              </div>
-            </CardContent>
-          </Card>
-        </AnimatedCard>
+      {/* Telemetry Chart & Grid Activity */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2">
+          <OutputChart data={data.hourlyData} />
+        </div>
 
-        <AnimatedCard>
+        <div className="space-y-4">
+          {/* Quick Knowledge Highlights */}
           <Card>
-            <CardHeader>
-              <CardTitle className="text-sm text-muted-foreground">Grid Activity</CardTitle>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-bold flex items-center gap-2">
+                <BookOpen className="h-4 w-4 text-amber-500" />
+                <span>Telangana Solar Rules</span>
+              </CardTitle>
             </CardHeader>
-            <CardContent className="flex flex-col gap-1">
-              {data.gridStatus === 'selling' && (
-                <>
-                  <div className="flex justify-between">
-                    <span className="text-sm text-muted-foreground">Units sold to grid</span>
-                    <span className="font-semibold text-green-600">
-                      {(data.todayTotal - data.dailyConsumption).toFixed(2)} kWh
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-sm text-muted-foreground">Net metering earnings</span>
-                    <span className="font-semibold text-green-600">₹{data.netMeteringEarnings}</span>
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-2">@ ₹3.5/unit govt rate (demo)</p>
-                </>
-              )}
-              {data.gridStatus === 'buying' && (
-                <>
-                  <div className="flex justify-between">
-                    <span className="text-sm text-muted-foreground">Units drawn from grid</span>
-                    <span className="font-semibold text-red-500">{data.gridUnitsDrawn} kWh</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-sm text-muted-foreground">Grid cost</span>
-                    <span className="font-semibold text-red-500">
-                      ₹{(data.gridUnitsDrawn * 8).toFixed(2)}
-                    </span>
-                  </div>
-                </>
-              )}
-              {data.gridStatus === 'self-reliant' && (
-                <p className="text-sm text-blue-600 font-semibold mt-2">
-                  Running entirely on solar today
+            <CardContent className="space-y-3 text-xs">
+              <div className="p-2.5 rounded-lg bg-muted/40 space-y-1">
+                <span className="font-semibold text-foreground">TGERC Net-Metering:</span>
+                <p className="text-muted-foreground">
+                  Allowed up to 100% of sanctioned load, capped at 1000 kW per consumer connection.
                 </p>
-              )}
+              </div>
+
+              <div className="p-2.5 rounded-lg bg-muted/40 space-y-1">
+                <span className="font-semibold text-foreground">Annual Settlement:</span>
+                <p className="text-muted-foreground">
+                  Unused energy credits are settled every financial year on March 31st at the average pooled power cost.
+                </p>
+              </div>
+
+              <Link href="/knowledge">
+                <Button variant="ghost" size="sm" className="w-full text-xs gap-1 mt-1">
+                  <span>Open Knowledge Bench</span>
+                  <ArrowRight className="h-3 w-3" />
+                </Button>
+              </Link>
             </CardContent>
           </Card>
-        </AnimatedCard>
-      </AnimatedContainer>
 
-      <OutputChart data={data.hourlyData} />
+          {/* Quick Agent Query Box */}
+          <Card className="border-amber-500/20 bg-amber-500/5">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-xs font-bold flex items-center gap-2">
+                <Sparkles className="h-3.5 w-3.5 text-amber-600" />
+                <span>Instant Consultation Questions</span>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-1.5 text-xs">
+              <Link
+                href="/chat?q=How+much+subsidy+do+I+get+for+a+3kW+system+in+Hyderabad"
+                className="block p-2 rounded hover:bg-background/80 transition-colors text-foreground font-medium"
+              >
+                → How much subsidy for 3 kW in Hyderabad?
+              </Link>
+              <Link
+                href="/chat?q=What+is+the+step-by-step+TSSPDCL+approval+procedure"
+                className="block p-2 rounded hover:bg-background/80 transition-colors text-foreground font-medium"
+              >
+                → What is the TSSPDCL approval procedure?
+              </Link>
+              <Link
+                href="/chat?q=What+is+the+difference+between+net+metering+and+gross+metering"
+                className="block p-2 rounded hover:bg-background/80 transition-colors text-foreground font-medium"
+              >
+                → What is net vs gross metering?
+              </Link>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
     </PageWrapper>
   )
 }

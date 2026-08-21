@@ -1,35 +1,21 @@
-import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
-import "./globals.css";
-
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
+import type { Metadata } from 'next'
+import './globals.css'
 
 export const metadata: Metadata = {
-  title: "Solar Intelligence Platform",
-  description: "Monitor and optimize solar energy output and financial returns",
-};
+  title: 'Solar Intelligence Platform — Telangana Rooftop Solar Planning',
+  description: 'AI-powered rooftop solar planning grounded in official Telangana regulations, incentives, and deterministic calculations.',
+}
 
 export default function RootLayout({
   children,
 }: Readonly<{
-  children: React.ReactNode;
+  children: React.ReactNode
 }>) {
   return (
-    <html
-      lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
-    >
-      <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
+    <html lang="en" className="h-full antialiased">
+      <body className="font-sans antialiased min-h-screen bg-background text-foreground">
         {children}
       </body>
     </html>
-  );
+  )
 }

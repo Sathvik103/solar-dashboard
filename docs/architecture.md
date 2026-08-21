@@ -1,59 +1,68 @@
 # System Architecture: Solar Intelligence Platform
 
-## Overview
+## 1. High-Level Architecture Overview
 
-The Solar Intelligence Platform is built on a four-layer server-first architecture using Next.js App Router, Supabase, and Google Gemini Embeddings.
+The Solar Intelligence Platform is built on a modular server-first architecture combining Next.js 16 App Router, Supabase PostgreSQL with `pgvector`, Gemini LLM and Embedding models, deterministic physics calculation tools, and an autonomous Agent Orchestrator with formal verification guardrails.
 
 ```
-┌─────────────────────────────────────────────────────────┐
-│                 Presentation Layer                      │
-│   (App Router: Public, App Shell & Knowledge Test Bench)│
-└───────────────────────────┬─────────────────────────────┘
-                            │
-┌───────────────────────────▼─────────────────────────────┐
-│              Action & Retrieval Layer                   │
-│   (Server Actions, RAG Retrieval Service, Search API)   │
-└───────────────────────────┬─────────────────────────────┘
-                            │
-┌───────────────────────────▼─────────────────────────────┐
-│                 Data Access Layer (DAL)                 │
-│         (Server-only: Users, Profiles, Knowledge)       │
-└───────────────────────────┬─────────────────────────────┘
-                            │
-┌───────────────────────────▼─────────────────────────────┐
-│               Infrastructure / Database                 │
-│     (Supabase PostgreSQL + pgvector, Gemini Embeddings) │
-└─────────────────────────────────────────────────────────┘
+┌────────────────────────────────────────────────────────────────────────┐
+│                        Presentation Layer                              │
+│   (Landing, Dashboard, AI Advisor /chat, Solar Studio /analysis, KB)   │
+└───────────────────────────────────┬────────────────────────────────────┘
+                                    │
+┌───────────────────────────────────▼────────────────────────────────────┐
+│                    Agent & AI Orchestration Layer                      │
+│   - Planner & Intent Classifier (lib/agent/planner.ts)                 │
+│   - Safe Deterministic Tool Executor (lib/agent/executor.ts)           │
+│   - RAG Grounding & Citations Engine (lib/ai/citations.ts)             │
+│   - Gemini 2.5 LLM Synthesis Service (lib/ai/llm.ts)                   │
+│   - Verification & Safety Guardrail Agent (lib/agent/verifier.ts)      │
+└───────────────────────────────────┬────────────────────────────────────┘
+                                    │
+┌───────────────────────────────────▼────────────────────────────────────┐
+│                Deterministic Tools & ML Subsystems                     │
+│   - 10 Specialized Calculation Tools (lib/agent/tools/*)               │
+│   - Solar Sizing & Tariff Slabs (lib/calculations/*)                   │
+│   - Deccan Plateau ML Regression Model (lib/ml/*)                      │
+│   - Dense pgvector RAG Engine (lib/rag/retrieval.ts)                   │
+└───────────────────────────────────┬────────────────────────────────────┘
+                                    │
+┌───────────────────────────────────▼────────────────────────────────────┐
+│                     Data Access Layer (DAL)                            │
+│   (Server-only: Users, Solar Profiles, Knowledge, Conversations)       │
+└───────────────────────────────────┬────────────────────────────────────┘
+                                    │
+┌───────────────────────────────────▼────────────────────────────────────┐
+│                   Database & Cloud Infrastructure                      │
+│   (Supabase PostgreSQL + pgvector, RLS Policies, Gemini 1536-dim Embed)│
+└────────────────────────────────────────────────────────────────────────┘
 ```
-
-## Architectural Layers (Phase 3 Status)
-
-1. **Presentation Layer (`app/`, `components/`)**
-   - Public route group `app/(public)/`: Home, Login, Signup pages. Shared public navigation shell.
-   - App route group `app/(app)/`: Dashboard, Calculator, History, Knowledge Base Test Bench (`/knowledge`), Profile pages.
-   - React Server Components (RSC) by default for pages (`export const dynamic = 'force-dynamic'`). Interactive forms and test controls are isolated in `'use client'` leaf components.
-
-2. **Action & Retrieval Layer (`actions/`, `lib/rag/`, `app/api/knowledge/`)**
-   - Server Actions (`'use server'`) handle state mutations such as login, signup, logout, and solar profile upserts.
-   - RAG Retrieval Engine (`lib/rag/retrieval.ts`): Accepts natural-language query -> generates 1536-dim embedding via `lib/ai/embeddings.ts` -> executes pgvector similarity search -> returns structured source passages with full provenance metadata.
-   - **No LLM Generation Step**: Phase 3 contains NO LLM answer generation or chatbot capability. Retrieval operates independently.
-   - Search API (`app/api/knowledge/search/route.ts`): Protected endpoint for knowledge querying.
-   - Admin Ingestion API (`app/api/knowledge/ingest/route.ts`): Protected endpoint requiring explicit `KNOWLEDGE_ADMIN_USER_IDS` authorization.
-
-3. **Data Access Layer / DAL (`lib/dal/`)**
-   - Server-only modules (`import 'server-only'`) providing domain-specific functions (`getCurrentUser()`, `getSolarProfile()`, `executeVectorSearch()`).
-   - Standard user operations and knowledge retrieval use `SSR_Server_Client` (`lib/db/client.ts`) created via `@supabase/ssr` with the public anon key and cookies. Row Level Security (RLS) is automatically enforced by PostgreSQL (`status = 'published'`).
-
-4. **Infrastructure & Security Layer (`supabase/`, `lib/db/`, `lib/ai/`)**
-   - PostgreSQL database hosted on Supabase with `pgvector` extension.
-   - Gemini Embedding Service (`lib/ai/embeddings.ts`): Generates 1536-dimensional embeddings using `gemini-embedding-001`.
-   - `GEMINI_API_KEY` stored exclusively in server environment variables (`.env.local`), never exposed to client code.
-   - HNSW index on `document_chunks.embedding` using cosine distance (`vector_cosine_ops`).
 
 ---
 
-## Security & Admin Access Strategy
+## 2. Core Subsystems
 
-- **Knowledge Retrieval**: Publicly searchable by all authenticated users via SSR client with RLS (`status = 'published'`).
-- **Knowledge Admin Ingestion**: Ingestion routines are restricted to explicitly listed `KNOWLEDGE_ADMIN_USER_IDS`. Unauthorized insertion/modification attempts return HTTP 403 Forbidden.
-- **Service-Role Key**: Never imported or used in standard user request paths or client components.
+### A. Autonomous Agent Orchestrator (`lib/agent/`)
+- **Intent Classification & Planning (`planner.ts`):** Evaluates natural-language queries into structured intents (`full_solar_plan`, `compare_options`, `financial_roi`, `application_guide`, `regulatory_inquiry`).
+- **Safe Tool Execution (`executor.ts`):** Executes scheduled deterministic tools with error boundaries and strict step caps (`MAX_AGENT_STEPS = 6`).
+- **Response Verification (`verifier.ts`):** Audits candidate answers for arithmetic consistency with tool outputs, verifies presence of authoritative citations, and enforces regulatory disclaimers.
+- **Trace Observability (`orchestrator.ts`):** Logs granular execution trace events (`intent_detection`, `profile_load`, `tool_call`, `retrieval`, `synthesis`, `verification`) into the `agent_runs` table in PostgreSQL.
+
+### B. Deterministic Calculation Engine (`lib/calculations/` & `lib/agent/tools/`)
+- **Tariff Slab Calculations (`tariffs.ts`):** Telangana TSSPDCL domestic LT-1 telescopic billing slabs (0-100, 101-200, 201-300, 301-400, 401-500, >500 units).
+- **System Sizing Recommender (`systemSizing.ts`):** Sizes systems to offset 90-100% of consumption subject to roof area constraints (90 sq.ft/kW) and TGERC regulations.
+- **Financial Projections (`financial.ts`):** 25-year Net Present Value (NPV), dynamic payback period with 3% tariff escalation, PM Surya Ghar subsidy deductions (₹78,000 max), and carbon reduction metrics.
+
+### C. Regional Machine Learning Subsystem (`lib/ml/`)
+- **Physics-Informed Climate Model:** Multi-variable regression model trained on Deccan plateau GHI and ambient temperature data.
+- **Predictions:** 12-month generation curves with 95% confidence intervals, seasonal monsoon derating, and cell temperature degradation (\(-0.38\% / ^\circ\text{C}\) above 25°C).
+
+### D. Dense Vector RAG Pipeline (`lib/rag/`)
+- **Curated Authoritative Knowledge Base:** TGERC Regulation 1 of 2016, TGREDCO Technical Guidelines, TSSPDCL Net-Metering Guide, and MNRE PM Surya Ghar Operational Guidelines.
+- **Embeddings:** 1536-dimensional vectors generated via `gemini-embedding-001`.
+- **Search:** `match_document_chunks` RPC function using HNSW cosine distance indexing in pgvector.
+
+### E. Persistent Memory & Data Access Layer (`lib/dal/`)
+- **User Profiles:** `solar_profiles` table.
+- **Conversations & Messages:** Multi-turn chat persistence with RLS in `conversations` and `messages` tables.
+- **Agent Runs:** Real-time observability and audit logging in `agent_runs`.

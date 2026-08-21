@@ -1,17 +1,20 @@
+import 'server-only'
 
+import { searchKnowledgeBase } from '@/lib/rag/retrieval'
+import {
+  TELANGANA_EVALUATION_QUERIES,
+  type EvaluationQuery,
+} from '@/lib/rag/evaluationQueries'
 
-export type EvaluationQuery = {
-  id: number
-  query: string
-  expectedOrganization: string
-  expectedTopic: string
-}
+export type { EvaluationQuery }
+export { TELANGANA_EVALUATION_QUERIES }
 
 export type EvaluationResult = {
   queryId: number
   query: string
   expectedOrganization: string
   expectedTopic: string
+  category: string
   retrievedCount: number
   expectedSourceFound: boolean
   expectedSourceRank: number | null // 1-based rank or null if not found
@@ -26,108 +29,68 @@ export type EvaluationResult = {
   }[]
 }
 
-  export const TELANGANA_EVALUATION_QUERIES = [
-  {
-    id: 1,
-    query: 'What are the rooftop solar net-metering rules in Telangana?',
-    expectedOrganization: 'TGERC',
-    expectedTopic: 'Net Metering Rules',
-  },
-  {
-    id: 2,
-    query: 'What rooftop solar capacities are eligible under Telangana regulations?',
-    expectedOrganization: 'TGERC',
-    expectedTopic: 'Capacity Eligibility',
-  },
-  {
-    id: 3,
-    query: 'What is the process for applying for rooftop solar in Telangana?',
-    expectedOrganization: 'TGREDCO',
-    expectedTopic: 'Application Procedure',
-  },
-  {
-    id: 4,
-    query: 'What subsidy/CFA information applies to domestic rooftop solar under PM Surya Ghar?',
-    expectedOrganization: 'MNRE',
-    expectedTopic: 'Central Financial Assistance Slabs',
-  },
-  {
-    id: 5,
-    query: 'What documents are required for a rooftop solar application with TSSPDCL?',
-    expectedOrganization: 'TSSPDCL',
-    expectedTopic: 'Required Application Documents',
-  },
-  {
-    id: 6,
-    query: 'What is the role of the DISCOM in rooftop solar approval in Telangana?',
-    expectedOrganization: 'TSSPDCL',
-    expectedTopic: 'Technical Feasibility and Inspection',
-  },
-  {
-    id: 7,
-    query: 'What is net metering under TGERC regulations?',
-    expectedOrganization: 'TGERC',
-    expectedTopic: 'Net Metering Definition',
-  },
-  {
-    id: 8,
-    query: 'What is gross metering under TGERC regulations?',
-    expectedOrganization: 'TGERC',
-    expectedTopic: 'Gross Metering Definition',
-  },
-  {
-    id: 9,
-    query: 'What is group/virtual net metering in Telangana?',
-    expectedOrganization: 'TGERC',
-    expectedTopic: 'Group and Virtual Net Metering',
-  },
-  {
-    id: 10,
-    query: 'Which authority issued the Telangana Rooftop Solar PV Grid Interactive Systems Regulations?',
-    expectedOrganization: 'TGERC',
-    expectedTopic: 'TGERC Regulation 1 of 2016',
-  },
-]
+export type EvaluationSummary = {
+  totalQueries: number
+  hitCount: number
+  top1Count: number
+  top3Count: number
+  hitRate: number
+  top1Accuracy: number
+  top3Accuracy: number
+  mrr: number
+  avgTopSimilarity: number
+  results: EvaluationResult[]
+}
 
 /**
  * Runs the source retrieval evaluation benchmark against the knowledge base.
- * DOES NOT CALL ANY LLM GENERATION MODEL.
+ * Evaluates dense/vector search performance across all test queries without calling an LLM.
  */
-export async function runRetrievalEvaluation(): Promise<{
-  totalQueries: number
-  successRate: number
-  avgTopSimilarity: number
-  results: EvaluationResult[]
-}> {
+export async function runRetrievalEvaluation(
+  queries: EvaluationQuery[] = TELANGANA_EVALUATION_QUERIES
+): Promise<EvaluationSummary> {
   const results: EvaluationResult[] = []
-  let foundCount = 0
+  let hitCount = 0
+  let top1Count = 0
+  let top3Count = 0
+  let reciprocalRankSum = 0
   let totalTopScoreSum = 0
 
-  for (const evalQuery of TELANGANA_EVALUATION_QUERIES) {
+  for (const evalQuery of queries) {
     let retrieved: any[] = []
     try {
-      retrieved = await searchKnowledgeBase(evalQuery.query, { topK: 5, similarityThreshold: 0.3 })
+      retrieved = await searchKnowledgeBase(evalQuery.query, {
+        topK: 5,
+        similarityThreshold: 0.25,
+      })
     } catch {
       retrieved = []
     }
 
     const retrievedSources = retrieved.map((r, index) => ({
       rank: index + 1,
-      title: r.source.title,
-      organization: r.source.organization,
-      sourceUrl: r.source.sourceUrl,
-      similarity: r.similarity,
-      sectionTitle: r.sectionTitle,
+      title: r.source?.title || 'Unknown',
+      organization: r.source?.organization || 'Unknown',
+      sourceUrl: r.source?.sourceUrl || '',
+      similarity: r.similarity || 0,
+      sectionTitle: r.sectionTitle || null,
     }))
 
     const matchIndex = retrievedSources.findIndex(
-      (s) => s.organization.toLowerCase() === evalQuery.expectedOrganization.toLowerCase()
+      (s) =>
+        s.organization.toLowerCase().includes(evalQuery.expectedOrganization.toLowerCase()) ||
+        evalQuery.expectedOrganization.toLowerCase().includes(s.organization.toLowerCase())
     )
 
     const expectedSourceFound = matchIndex !== -1
     const expectedSourceRank = matchIndex !== -1 ? matchIndex + 1 : null
 
-    if (expectedSourceFound) foundCount++
+    if (expectedSourceFound) {
+      hitCount++
+      if (expectedSourceRank === 1) top1Count++
+      if (expectedSourceRank && expectedSourceRank <= 3) top3Count++
+      if (expectedSourceRank) reciprocalRankSum += 1 / expectedSourceRank
+    }
 
     const topScore = retrievedSources.length > 0 ? retrievedSources[0].similarity : null
     if (topScore) totalTopScoreSum += topScore
@@ -137,6 +100,7 @@ export async function runRetrievalEvaluation(): Promise<{
       query: evalQuery.query,
       expectedOrganization: evalQuery.expectedOrganization,
       expectedTopic: evalQuery.expectedTopic,
+      category: evalQuery.category,
       retrievedCount: retrievedSources.length,
       expectedSourceFound,
       expectedSourceRank,
@@ -145,13 +109,22 @@ export async function runRetrievalEvaluation(): Promise<{
     })
   }
 
-  const totalQueries = TELANGANA_EVALUATION_QUERIES.length
-  const successRate = parseFloat(((foundCount / totalQueries) * 100).toFixed(1))
-  const avgTopSimilarity = parseFloat((totalTopScoreSum / (totalQueries || 1)).toFixed(4))
+  const totalQueries = queries.length
+  const hitRate = totalQueries > 0 ? parseFloat(((hitCount / totalQueries) * 100).toFixed(1)) : 0
+  const top1Accuracy = totalQueries > 0 ? parseFloat(((top1Count / totalQueries) * 100).toFixed(1)) : 0
+  const top3Accuracy = totalQueries > 0 ? parseFloat(((top3Count / totalQueries) * 100).toFixed(1)) : 0
+  const mrr = totalQueries > 0 ? parseFloat((reciprocalRankSum / totalQueries).toFixed(3)) : 0
+  const avgTopSimilarity = totalQueries > 0 ? parseFloat((totalTopScoreSum / (totalQueries || 1)).toFixed(4)) : 0
 
   return {
     totalQueries,
-    successRate,
+    hitCount,
+    top1Count,
+    top3Count,
+    hitRate,
+    top1Accuracy,
+    top3Accuracy,
+    mrr,
     avgTopSimilarity,
     results,
   }

@@ -1,5 +1,3 @@
-import pdfParse from 'pdf-parse'
-
 export type ExtractedDocument = {
   text: string
   numPages: number
@@ -11,6 +9,9 @@ export type ExtractedDocument = {
  */
 export async function extractTextFromPdf(pdfBuffer: Buffer): Promise<ExtractedDocument> {
   try {
+    // Dynamic import to support both CJS and ESM environments cleanly
+    const pdfParseModule = await import('pdf-parse')
+    const pdfParse = (pdfParseModule as any).default || pdfParseModule
     const data = await pdfParse(pdfBuffer)
     return {
       text: data.text || '',

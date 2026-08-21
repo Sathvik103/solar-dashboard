@@ -1,137 +1,109 @@
-# Database Documentation: Solar Intelligence Platform (Phase 3 Schema)
+# Database Schema & Migrations: Solar Intelligence Platform
 
 ## Overview
-
-The database uses PostgreSQL hosted on Supabase with the `pgvector` extension enabled for vector similarity search. Row Level Security (RLS) is active across all tables.
-
----
-
-## Entity Relationship Diagram (Phase 3)
-
-```
- auth.users (Supabase Auth)
-     │
-     ├─ 1:1 (Trigger: on_auth_user_created) ──► public.users ──► public.solar_profiles
-     │
- public.documents (Authoritative Policy & Technical Sources)
-     │
-     └─ 1:N (FK: document_id ON DELETE CASCADE) ──► public.document_chunks (vector(1536))
-```
+The platform database is built on PostgreSQL 15+ hosted on Supabase, with Row Level Security (RLS) enabled across all tables and `pgvector` for dense similarity search.
 
 ---
 
-## Phase 3 Database Tables & DDL
+## 1. Schema Tables
 
-### 1. `public.documents` Table
+### A. `public.users`
+Managed alongside Supabase Auth.
+- `id` (UUID, PK, references `auth.users`)
+- `email` (TEXT)
+- `full_name` (TEXT)
+- `avatar_url` (TEXT)
+- `created_at` / `updated_at` (TIMESTAMPTZ)
 
-Stores authoritative policy guidelines, tariffs, and regulation sources.
+### B. `public.solar_profiles`
+Stores user-entered energy and property telemetry.
+- `id` (UUID, PK)
+- `user_id` (UUID, FK -> `users.id` ON DELETE CASCADE)
+- `city` (TEXT, default 'Hyderabad')
+- `state` (TEXT, default 'Telangana')
+- `district` / `pincode` (TEXT)
+- `monthly_bill_inr` (NUMERIC)
+- `monthly_units_kwh` (NUMERIC)
+- `electricity_tariff_inr` (NUMERIC)
+- `roof_area_sqft` (NUMERIC)
+- `roof_type` (TEXT)
+- `roof_orientation` (TEXT)
+- `shading_level` (TEXT)
+- `budget_inr` (NUMERIC)
+- `preferred_capacity_kw` (NUMERIC)
+- `battery_preference` (TEXT)
 
-```sql
-CREATE TABLE public.documents (
-  id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  title            TEXT NOT NULL,
-  source           TEXT NOT NULL,
-  source_url       TEXT NOT NULL,
-  organization     TEXT NOT NULL,
-  document_type    TEXT NOT NULL,
-  location_scope   TEXT NOT NULL DEFAULT 'Telangana',
-  publication_date DATE,
-  effective_date   DATE,
-  version          TEXT,
-  content_hash     TEXT NOT NULL UNIQUE,
-  status           TEXT NOT NULL DEFAULT 'published' CHECK (status IN ('draft', 'published', 'archived')),
-  created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  updated_at       TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-```
+### C. `public.documents`
+Authoritative government and regulatory source publications.
+- `id` (UUID, PK)
+- `title` (TEXT)
+- `source` (TEXT)
+- `source_url` (TEXT)
+- `organization` (TEXT) - e.g. TGERC, TGREDCO, TSSPDCL, MNRE
+- `document_type` (TEXT) - e.g. Regulation, Technical Guideline
+- `location_scope` (TEXT, default 'Telangana')
+- `publication_date` / `effective_date` (DATE)
+- `version` (TEXT)
+- `content_hash` (TEXT UNIQUE)
+- `status` (TEXT) - 'draft' | 'published' | 'archived'
 
-### 2. `public.document_chunks` Table
+### D. `public.document_chunks`
+Structure-aware chunked text passages with 1536-dimensional embeddings.
+- `id` (UUID, PK)
+- `document_id` (UUID, FK -> `documents.id` ON DELETE CASCADE)
+- `chunk_index` (INT)
+- `content` (TEXT)
+- `token_count` (INT)
+- `page_number` (INT)
+- `section_title` (TEXT)
+- `metadata` (JSONB)
+- `embedding` (vector(1536))
+- **Index:** `document_chunks_embedding_hnsw_idx` USING `hnsw (embedding vector_cosine_ops)`
 
-Stores structure-aware text chunks with 1536-dimensional Gemini vector embeddings.
+### E. `public.conversations`
+Persistent multi-turn chat sessions.
+- `id` (UUID, PK)
+- `user_id` (UUID, FK -> `users.id` ON DELETE CASCADE)
+- `title` (TEXT)
+- `created_at` / `updated_at` (TIMESTAMPTZ)
 
-```sql
-CREATE TABLE public.document_chunks (
-  id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  document_id   UUID NOT NULL REFERENCES public.documents(id) ON DELETE CASCADE,
-  chunk_index   INT NOT NULL,
-  content       TEXT NOT NULL,
-  token_count   INT NOT NULL DEFAULT 0,
-  page_number   INT,
-  section_title TEXT,
-  metadata      JSONB NOT NULL DEFAULT '{}'::jsonb,
-  embedding     vector(1536),
-  created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  CONSTRAINT uq_document_chunk_index UNIQUE (document_id, chunk_index)
-);
+### F. `public.messages`
+Individual messages within a conversation.
+- `id` (UUID, PK)
+- `conversation_id` (UUID, FK -> `conversations.id` ON DELETE CASCADE)
+- `user_id` (UUID, FK -> `users.id` ON DELETE CASCADE)
+- `role` (TEXT) - 'user' | 'assistant' | 'system' | 'tool'
+- `content` (TEXT)
+- `citations` (JSONB)
+- `tool_calls` (JSONB)
+- `trace_events` (JSONB)
 
--- HNSW Cosine Distance Index
-CREATE INDEX document_chunks_embedding_hnsw_idx
-  ON public.document_chunks
-  USING hnsw (embedding vector_cosine_ops);
-```
+### G. `public.agent_runs`
+Observability log of agent runs.
+- `id` (UUID, PK)
+- `user_id` (UUID, FK -> `users.id` ON DELETE CASCADE)
+- `conversation_id` (UUID, FK -> `conversations.id`)
+- `request` (TEXT)
+- `status` (TEXT) - 'running' | 'completed' | 'failed'
+- `tools_used` (JSONB)
+- `retrieval_count` (INT)
+- `verification_status` (TEXT)
+- `latency_ms` (INT)
 
-### 3. Vector Similarity Search Function (`match_document_chunks`)
+---
 
-```sql
-CREATE OR REPLACE FUNCTION public.match_document_chunks(
-  query_embedding vector(1536),
-  match_count INT DEFAULT 5,
-  similarity_threshold FLOAT DEFAULT 0.5,
-  filter_location_scope TEXT DEFAULT NULL,
-  filter_document_type TEXT DEFAULT NULL,
-  filter_organization TEXT DEFAULT NULL
-)
-RETURNS TABLE (
-  chunk_id UUID,
-  document_id UUID,
-  content TEXT,
-  similarity FLOAT,
-  page_number INT,
-  section_title TEXT,
-  chunk_index INT,
-  document_title TEXT,
-  organization TEXT,
-  source_url TEXT,
-  document_type TEXT,
-  location_scope TEXT,
-  publication_date DATE,
-  effective_date DATE,
-  version TEXT
-)
-LANGUAGE plpgsql
-STABLE
-SECURITY DEFINER
-SET search_path = public, extensions
-AS $$
-BEGIN
-  RETURN QUERY
-  SELECT
-    c.id AS chunk_id,
-    c.document_id,
-    c.content,
-    (1 - (c.embedding <=> query_embedding))::FLOAT AS similarity,
-    c.page_number,
-    c.section_title,
-    c.chunk_index,
-    d.title AS document_title,
-    d.organization,
-    d.source_url,
-    d.document_type,
-    d.location_scope,
-    d.publication_date,
-    d.effective_date,
-    d.version
-  FROM public.document_chunks c
-  INNER JOIN public.documents d ON d.id = c.document_id
-  WHERE d.status = 'published'
-    AND c.embedding IS NOT NULL
-    AND (1 - (c.embedding <=> query_embedding)) >= similarity_threshold
-    AND (filter_location_scope IS NULL OR d.location_scope = filter_location_scope)
-    AND (filter_document_type IS NULL OR d.document_type = filter_document_type)
-    AND (filter_organization IS NULL OR d.organization = filter_organization)
-  ORDER BY c.embedding <=> query_embedding ASC
-  LIMIT match_count;
-END;
-$$;
-```
+## 2. Stored Procedures & Vector RPC
+- `public.match_document_chunks`:
+  Takes `(query_embedding vector(1536), match_count INT, similarity_threshold FLOAT, filter_location_scope TEXT, filter_document_type TEXT, filter_organization TEXT)` and returns sorted matching chunks with cosine similarity:
+  \[
+  \text{similarity} = 1 - (c.\text{embedding} \Leftrightarrow \text{query\_embedding})
+  \]
+
+---
+
+## 3. Row Level Security (RLS) Summary
+- `users`: Users can only read/update their own profile.
+- `solar_profiles`: Users can only read/update their own solar profile.
+- `documents` & `document_chunks`: Public SELECT for `status = 'published'`. INSERT/UPDATE restricted to `service_role` or authorized admin IDs.
+- `conversations` & `messages`: Users can only SELECT, INSERT, UPDATE, and DELETE their own records (`auth.uid() = user_id`).
+- `agent_runs`: Users can only view their own execution logs.
