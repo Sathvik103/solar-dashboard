@@ -1,17 +1,18 @@
 import type { IngestDocumentInput } from '@/lib/rag/ingestion'
 
 export const tgercRegulation2016: IngestDocumentInput = {
-  title: 'TGERC Rooftop Solar PV Grid Interactive Systems Regulations, 2016 (Regulation No. 1 of 2016)',
+  title: 'Summary: TGERC Rooftop Solar PV Grid Interactive Systems Regulations, 2016 (Regulation No. 1 of 2016)',
   source: 'Telangana State Electricity Regulatory Commission (TGERC)',
   sourceUrl: 'https://tgerc.telangana.gov.in/file_upload/rules_regulations/Rooftop_Solar_PV_Regulations_2016.pdf',
   organization: 'TGERC',
-  documentType: 'Regulation',
+  documentType: 'Regulation (unofficial summary)',
   locationScope: 'Telangana',
   publicationDate: '2016-11-23',
   effectiveDate: '2016-11-23',
   version: 'Regulation No. 1 of 2016',
   status: 'published',
   content: `
+NOTE: This is an unofficial summary prepared for SolarIntel, not the verbatim official text. Verify figures and procedures against the source URL before relying on them.
 --- Page 1 ---
 TELANGANA STATE ELECTRICITY REGULATORY COMMISSION (TGERC)
 HYDERABAD

@@ -1,17 +1,18 @@
 import type { IngestDocumentInput } from '@/lib/rag/ingestion'
 
 export const tgredcoGuidelines: IngestDocumentInput = {
-  title: 'TGREDCO Grid Connected Rooftop Solar Power Plant Technical Guidelines & Application Procedure',
+  title: 'Summary: TGREDCO Grid Connected Rooftop Solar Power Plant Technical Guidelines & Application Procedure',
   source: 'Telangana State Renewable Energy Development Corporation Ltd (TGREDCO)',
   sourceUrl: 'https://tgredco.telangana.gov.in/Rooftop_Solar_Guidelines.pdf',
   organization: 'TGREDCO',
-  documentType: 'Official Guidance',
+  documentType: 'Official Guidance (unofficial summary)',
   locationScope: 'Telangana',
   publicationDate: '2021-08-01',
   effectiveDate: '2021-08-01',
   version: 'v2.1',
   status: 'published',
   content: `
+NOTE: This is an unofficial summary prepared for SolarIntel, not the verbatim official text. Verify figures and procedures against the source URL before relying on them.
 --- Page 1 ---
 TELANGANA STATE RENEWABLE ENERGY DEVELOPMENT CORPORATION LTD (TGREDCO)
 HYDERABAD, TELANGANA

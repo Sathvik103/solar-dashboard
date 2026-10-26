@@ -1,17 +1,18 @@
 import type { IngestDocumentInput } from '@/lib/rag/ingestion'
 
 export const tsspdclGuide: IngestDocumentInput = {
-  title: 'TSSPDCL Net Metering Consumer Guide & Solar Feasibility Process',
+  title: 'Summary: TSSPDCL Net Metering Consumer Guide & Solar Feasibility Process',
   source: 'Telangana State Southern Power Distribution Company Limited (TSSPDCL)',
   sourceUrl: 'https://www.tssouthernpower.com/RooftopSolarNetMeteringProcedure.pdf',
   organization: 'TSSPDCL',
-  documentType: 'Consumer Procedure Guide',
+  documentType: 'Consumer Procedure Guide (unofficial summary)',
   locationScope: 'Telangana',
   publicationDate: '2022-04-15',
   effectiveDate: '2022-04-15',
   version: 'v1.3',
   status: 'published',
   content: `
+NOTE: This is an unofficial summary prepared for SolarIntel, not the verbatim official text. Verify figures and procedures against the source URL before relying on them.
 --- Page 1 ---
 TELANGANA STATE SOUTHERN POWER DISTRIBUTION COMPANY LIMITED (TSSPDCL)
 CORPORATE OFFICE, HYDERABAD
@@ -31,6 +32,6 @@ CONSUMER GUIDELINES FOR ROOFTOP SOLAR NET METERING IN HYDERABAD & SOUTHERN TELAN
 # SECTION 2: METERING AND TARIFF APPLICATION
 2.1 Bi-Directional Net Meter Specifications: TSSPDCL provides or tests the consumer-procured bi-directional meter (Accuracy Class 0.5S or 1.0) with DLMS protocol compliance.
 2.2 Solar Energy Generation Credit: TSSPDCL bills consumers on a monthly basis. Solar energy generated and fed into the TSSPDCL grid is offset unit-for-unit against units drawn from TSSPDCL during the billing month.
-2.3 Net Metering Buyback Rate: Net excess energy remaining at the annual settlement date (March 31st) is settled by TSSPDCL at the TGERC-approved tariff rate (interim benchmark ₹3.50 per kWh or prevailing ACPP rate).
+2.3 Net Metering Buyback Rate: Net excess energy remaining at the annual settlement date (March 31st) is settled by TSSPDCL at the Average Pooled Power Purchase Cost (APPC) determined by TGERC for that financial year (₹5.330/kWh for FY 2025-26).
 `,
 }

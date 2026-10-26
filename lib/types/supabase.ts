@@ -416,6 +416,10 @@ export interface Database {
         record_count: number; date_range_start: string | null; date_range_end: string | null
         source: string; created_at: string
       }, 'dataset_type'>
+      device_tokens: Tbl<{
+        id: string; user_id: string; name: string; token_hash: string; token_prefix: string
+        last_used_at: string | null; revoked_at: string | null; created_at: string
+      }, 'user_id' | 'name' | 'token_hash' | 'token_prefix'>
       ml_predictions: Tbl<{
         id: string; user_id: string; prediction_type: string; prediction_date: string
         predicted_value: number; actual_value: number | null; unit: string; model_version: string
@@ -426,6 +430,10 @@ export interface Database {
       [_ in never]: never
     }
     Functions: {
+      ingest_device_readings: {
+        Args: { p_token_hash: string; p_readings: Json }
+        Returns: number
+      }
       match_document_chunks: {
         Args: {
           query_embedding: string | number[]

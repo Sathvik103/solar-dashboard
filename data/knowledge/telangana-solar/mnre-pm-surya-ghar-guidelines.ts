@@ -1,17 +1,18 @@
 import type { IngestDocumentInput } from '@/lib/rag/ingestion'
 
 export const mnrePmSuryaGharGuidelines: IngestDocumentInput = {
-  title: 'PM Surya Ghar: Muft Bijli Yojana Central Financial Assistance Scheme Operational Guidelines',
+  title: 'Summary: PM Surya Ghar: Muft Bijli Yojana Central Financial Assistance Scheme Operational Guidelines',
   source: 'Ministry of New and Renewable Energy (MNRE), Government of India',
   sourceUrl: 'https://pmsuryaghar.gov.in/guidelines/PM_Surya_Ghar_CFA_Scheme_Guidelines_2024.pdf',
   organization: 'MNRE',
-  documentType: 'Central Government Scheme Guidelines',
+  documentType: 'Central Government Scheme Guidelines (unofficial summary)',
   locationScope: 'National',
   publicationDate: '2024-02-13',
   effectiveDate: '2024-02-13',
   version: '2024 Scheme Guidelines',
   status: 'published',
   content: `
+NOTE: This is an unofficial summary prepared for SolarIntel, not the verbatim official text. Verify figures and procedures against the source URL before relying on them.
 --- Page 1 ---
 MINISTRY OF NEW AND RENEWABLE ENERGY (MNRE)
 GOVERNMENT OF INDIA, NEW DELHI
