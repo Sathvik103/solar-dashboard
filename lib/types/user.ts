@@ -26,18 +26,26 @@ export type User = {
 // Solar Profile enum types
 // ---------------------------------------------------------------------------
 
-export type RoofType = 'flat-rcc' | 'sloped-tile' | 'metal-sheet' | 'other'
+export type RoofType = 'flat-rcc' | 'flat-concrete' | 'sloped-tile' | 'metal-sheet' | 'other'
 
 export type RoofOrientation =
   | 'south'
   | 'south-east'
   | 'south-west'
+  | 'east'
+  | 'west'
+  | 'north'
   | 'flat'
   | 'other'
 
-export type ShadingLevel = 'none' | 'partial' | 'heavy'
+export type ShadingLevel = 'none' | 'low' | 'medium' | 'high' | 'partial' | 'heavy'
 
-export type BatteryPreference = 'no-battery' | 'battery-backup' | 'off-grid'
+export type BatteryPreference =
+  | 'no-battery'
+  | 'add-battery-now'
+  | 'future-expansion'
+  | 'battery-backup'
+  | 'off-grid'
 
 // ---------------------------------------------------------------------------
 // Solar Profile

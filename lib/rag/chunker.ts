@@ -10,7 +10,7 @@ export type GeneratedChunk = {
   tokenCount: number
   pageNumber: number | null
   sectionTitle: string | null
-  metadata: Record<string, any>
+  metadata: Record<string, unknown>
 }
 
 /**
@@ -37,8 +37,6 @@ export function chunkDocument(
   }
 
   // Detect explicit page markers e.g. "--- Page 1 ---" or "\f"
-  const pageSections = fullText.split(/(?:--- Page (\d+) ---|\f)/gi)
-
   const rawBlocks: { text: string; page: number | null; section: string | null }[] = []
   let currentPage: number | null = 1
   let currentSection: string | null = null

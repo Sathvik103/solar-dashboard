@@ -22,25 +22,25 @@ async function generateEmbeddings(texts: string[], apiKey: string): Promise<numb
 
   for (const text of texts) {
     try {
-      const res: any = await ai.models.embedContent({
+      const res = await ai.models.embedContent({
         model: 'gemini-embedding-001',
         contents: text,
         config: { outputDimensionality: 1536 },
       })
-      const vals = res.embeddings?.[0]?.values || res.embedding?.values
+      const vals = res.embeddings?.[0]?.values
       if (!vals || vals.length !== 1536) {
         throw new Error(`Invalid embedding dimension: ${vals?.length}`)
       }
       embeddings.push(vals)
-    } catch (e: any) {
+    } catch {
       // Fallback to text-embedding-004
-      const res: any = await ai.models.embedContent({
+      const res = await ai.models.embedContent({
         model: 'text-embedding-004',
         contents: text,
         config: { outputDimensionality: 1536 },
       })
-      const vals = res.embeddings?.[0]?.values || res.embedding?.values
-      if (!vals) throw new Error(`Failed to generate embedding: ${e.message}`)
+      const vals = res.embeddings?.[0]?.values
+      if (!vals) throw new Error(`Failed to generate embedding with both models`)
       embeddings.push(vals)
     }
   }
@@ -87,8 +87,8 @@ export async function runIngestion() {
       try {
         embeddings = await generateEmbeddings(chunks.map((c) => c.content), GEMINI_KEY)
         console.log(`   ✅ Generated ${embeddings.length} vectors successfully.`)
-      } catch (err: any) {
-        console.warn(`   ⚠️ Embedding generation failed: ${err.message}`)
+      } catch (err) {
+        console.warn(`   ⚠️ Embedding generation failed: ${err instanceof Error ? err.message : String(err)}`)
       }
     } else {
       console.log(`   ℹ️ No GEMINI_API_KEY present in environment. Ingesting chunks without vector embeddings.`)

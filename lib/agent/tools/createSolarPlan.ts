@@ -5,7 +5,7 @@ import { searchKnowledgeBase } from '@/lib/rag/retrieval'
 export const CreateSolarPlanSchema = z.object({
   monthlyUnitsKwh: z.number().min(20).describe('Monthly consumption in kWh'),
   monthlyBillInr: z.number().optional().describe('Current monthly electricity bill in INR'),
-  roofAreaSqft: z.number().optional().default(800).describe('Roof area in sq.ft'),
+  roofAreaSqft: z.number().optional().describe('Roof area in sq.ft (omit if unknown)'),
   city: z.string().default('Hyderabad').describe('City location'),
 })
 
@@ -19,7 +19,7 @@ export async function createSolarPlanTool(input: CreateSolarPlanInput) {
   })
 
   // Retrieve relevant net-metering and subsidy policy chunks
-  let policyChunks: any[] = []
+  let policyChunks: { title: string; organization: string; url: string; section: string | null }[] = []
   try {
     const results = await searchKnowledgeBase(
       'rooftop solar subsidy net metering application procedure Telangana',

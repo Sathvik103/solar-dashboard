@@ -10,8 +10,9 @@ export async function GET() {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
   try {
-    const { profile: _profile, ...overview } = await buildDashboardOverview(user.id)
-    return NextResponse.json(overview, { headers: { 'Cache-Control': 'private, no-store' } })
+    const overview = await buildDashboardOverview(user.id)
+    // Profile contains personal details the client already gets via the profile page; omit it here.
+    return NextResponse.json({ ...overview, profile: undefined }, { headers: { 'Cache-Control': 'private, no-store' } })
   } catch (error) {
     console.error('[api/dashboard] failed', error)
     return NextResponse.json({ error: 'Failed to build dashboard' }, { status: 500 })

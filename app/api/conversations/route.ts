@@ -4,14 +4,15 @@ import {
   listUserConversations,
   createConversation,
 } from '@/lib/dal/conversations'
+import { errorMessage } from '@/lib/utils'
 
 export async function GET() {
   try {
     await requireUser()
     const conversations = await listUserConversations()
     return NextResponse.json({ conversations })
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message || 'Unauthorized' }, { status: 401 })
+  } catch (error) {
+    return NextResponse.json({ error: errorMessage(error) || 'Unauthorized' }, { status: 401 })
   }
 }
 
@@ -28,7 +29,7 @@ export async function POST(request: Request) {
 
     const conversation = await createConversation(title)
     return NextResponse.json({ conversation })
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message || 'Unauthorized' }, { status: 401 })
+  } catch (error) {
+    return NextResponse.json({ error: errorMessage(error) || 'Unauthorized' }, { status: 401 })
   }
 }

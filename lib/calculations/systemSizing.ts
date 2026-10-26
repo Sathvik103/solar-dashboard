@@ -45,7 +45,8 @@ export type SizingRecommendation = {
  */
 export function calculateOptimalSystemSize(input: SizingInput): SizingRecommendation {
   const monthlyUnits = input.monthlyUnitsKwh > 0 ? input.monthlyUnitsKwh : 350
-  const roofArea = input.roofAreaSqft && input.roofAreaSqft > 0 ? input.roofAreaSqft : 800
+  // Unknown roof area means no roof constraint is applied (capped at the largest standard size).
+  const roofArea = input.roofAreaSqft && input.roofAreaSqft > 0 ? input.roofAreaSqft : null
 
   // Shading derating factor
   const shadingFactor =
@@ -62,7 +63,7 @@ export function calculateOptimalSystemSize(input: SizingInput): SizingRecommenda
   if (recommendedKw > 10) recommendedKw = 10
 
   // 1 kW requires ~90 sq.ft of shadow-free area
-  const maxCapacityByRoof = Math.floor(roofArea / 90)
+  const maxCapacityByRoof = roofArea == null ? 10 : Math.floor(roofArea / 90)
   const isRoofSufficient = maxCapacityByRoof >= recommendedKw
 
   if (!isRoofSufficient && maxCapacityByRoof >= 1) {

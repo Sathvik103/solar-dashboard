@@ -1,5 +1,6 @@
 import { AGENT_TOOLS } from './tools'
 import type { ToolExecutionRecord } from './types'
+import { errorMessage } from '@/lib/utils'
 
 const MAX_AGENT_STEPS = 6
 
@@ -38,11 +39,11 @@ export async function executeAgentTools(
         durationMs,
         success: true,
       })
-    } catch (err: any) {
+    } catch (err) {
       records.push({
         tool: item.toolName,
         input: item.params,
-        output: { error: err.message || 'Tool execution error' },
+        output: { error: errorMessage(err) || 'Tool execution error' },
         durationMs: Date.now() - startTime,
         success: false,
       })

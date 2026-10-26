@@ -17,14 +17,13 @@ import {
   ShieldCheck,
   Cpu,
   Layers,
-  Search,
-} from 'lucide-react'
+  } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import type { Citation } from '@/lib/ai/citations'
 import type { TraceEvent, ToolExecutionRecord } from '@/lib/agent/types'
+import { errorMessage } from '@/lib/utils'
 
 type Message = {
   id: string
@@ -71,6 +70,7 @@ export default function ChatInterface({ initialConversationId }: { initialConver
     if (activeConversationId) {
       fetchMessages(activeConversationId)
     } else {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- reset transcript when switching to a new chat
       setMessages([])
     }
   }, [activeConversationId])
@@ -98,7 +98,7 @@ export default function ChatInterface({ initialConversationId }: { initialConver
       const data = await res.json()
       if (data.messages) {
         setMessages(
-          data.messages.map((m: any) => ({
+          data.messages.map((m: Message & { toolCalls?: Message['toolsUsed'] }) => ({
             id: m.id,
             role: m.role,
             content: m.content,
@@ -156,13 +156,13 @@ export default function ChatInterface({ initialConversationId }: { initialConver
       setMessages([...newMsgList, assistantMsg])
       // Auto-open trace for inspection
       setOpenTraces((prev) => ({ ...prev, [assistantMsg.id]: true }))
-    } catch (err: any) {
+    } catch (err) {
       setMessages([
         ...newMsgList,
         {
           id: `err-${Date.now()}`,
           role: 'assistant',
-          content: `⚠️ Error executing agent: ${err.message || 'Please check your connection and try again.'}`,
+          content: `⚠️ Error executing agent: ${errorMessage(err) || 'Please check your connection and try again.'}`,
         },
       ])
     } finally {
@@ -270,7 +270,7 @@ export default function ChatInterface({ initialConversationId }: { initialConver
               </div>
               <h3 className="text-lg font-bold">Ask the Solar Intelligence Agent</h3>
               <p className="text-sm text-muted-foreground mt-1 mb-6 leading-relaxed">
-                Get accurate, verified solar planning guidance grounded in Telangana's net-metering regulations,
+                Get accurate, verified solar planning guidance grounded in Telangana&apos;s net-metering regulations,
                 TSSPDCL procedures, and PM Surya Ghar subsidy rates.
               </p>
 

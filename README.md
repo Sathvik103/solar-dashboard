@@ -11,7 +11,7 @@ Nothing on the dashboard is hard-coded or randomly generated.
 | Hourly output / today's kWh | Physics PV model (`lib/solar/pvModel.ts`) driven by live plane-of-array irradiance and temperature from [Open-Meteo](https://open-meteo.com) for your city. Labelled "modelled". |
 | Logged generation, exports, imports | Entered by you (form or CSV) on **History** → `solar_generation_history`. |
 | Consumption, bills, tariff | Entered by you / CSV → `consumption_history`. Tariff = profile value, else bill-derived, else the slab model. |
-| Monthly climatology | ERA5 reanalysis via Open-Meteo archive (3-year mean). |
+| Monthly climatology (Studio, chat, ML export) | ERA5 reanalysis via Open-Meteo archive (3-year mean). |
 | Forecast metrics (MAE/RMSE/R²) | Computed from real `ml_predictions` prediction/actual pairs only. |
 | Regulations / subsidy answers | RAG over ingested TGERC / TGREDCO / MNRE documents with citations. |
 
@@ -46,4 +46,6 @@ Apply `supabase/migrations/*.sql` in order (001–006). Run `npm run ingest:know
   (e.g. via `upsertGenerationRecords(..., 'inverter_telemetry')`) to replace manual logs.
 - Telangana tariff slabs in `lib/calculations/tariffs.ts` and PM Surya Ghar subsidy tiers in `systemSizing.ts` are
   coded constants; verify against the current TGERC order and MNRE circular before relying on quotes.
+- The Analysis Studio is a what-if simulator: its inputs start from your profile (or generic examples if you have none).
+  It uses measured climatology from `/api/climate`, falling back to a built-in reference table only if that fails.
 - `public.regional_statistics` is intentionally empty; populate it only from a cited official source.

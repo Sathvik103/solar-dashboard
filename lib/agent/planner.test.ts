@@ -39,3 +39,24 @@ describe('Agent Execution Planner', () => {
     expect(plan.retrievalQuery).toContain('TSSPDCL')
   })
 })
+
+describe('Agent Execution Planner without profile data', () => {
+  it('does not invent consumption: asks for it instead of scheduling plan tools', () => {
+    const plan = planAgentExecution('What system should I install on my roof?')
+    expect(plan.intent).toBe('full_solar_plan')
+    expect(plan.toolsToExecute).toHaveLength(0)
+    expect(plan.missingInputs.join(' ')).toContain('monthlyUnitsKwh')
+  })
+
+  it('does not assume a capacity for cost questions', () => {
+    const plan = planAgentExecution('How much is the subsidy?', { monthlyUnitsKwh: 300 })
+    expect(plan.toolsToExecute).toHaveLength(0)
+    expect(plan.missingInputs.join(' ')).toContain('capacityKw')
+  })
+
+  it('uses the explicit capacity and real units when available', () => {
+    const plan = planAgentExecution('Cost of a 4kW system', { monthlyUnitsKwh: 300 })
+    expect(plan.toolsToExecute.map((t) => t.toolName)).toContain('calculateSavings')
+    expect(plan.missingInputs).toHaveLength(0)
+  })
+})

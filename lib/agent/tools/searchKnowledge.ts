@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { searchKnowledgeBase } from '@/lib/rag/retrieval'
+import { errorMessage } from '@/lib/utils'
 
 export const SearchKnowledgeSchema = z.object({
   query: z.string().min(3).describe('Natural language question to search in the solar knowledge base'),
@@ -36,11 +37,11 @@ export async function searchKnowledgeTool(input: SearchKnowledgeInput) {
         },
       })),
     }
-  } catch (error: any) {
+  } catch (error) {
     return {
       query: input.query,
       retrievalCount: 0,
-      error: error.message,
+      error: errorMessage(error),
       chunks: [],
     }
   }

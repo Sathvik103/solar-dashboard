@@ -10,6 +10,7 @@ import { generateLLMResponse } from '@/lib/ai/llm'
 import { getSolarProfile } from '@/lib/dal/solar-profiles'
 import { createSupabaseServerClient } from '@/lib/db/client'
 import type { AgentExecutionResult, TraceEvent } from './types'
+import { errorMessage } from '@/lib/utils'
 
 export type RunAgentOptions = {
   userId?: string
@@ -63,12 +64,12 @@ export async function runSolarAgent(
           budgetInr: p.budgetInr,
           preferredCapacityKw: p.preferredCapacityKw,
         }
-        addTrace('profile_load', 'completed', `Loaded solar profile for ${p.city} (${p.monthlyUnitsKwh || 350} kWh/mo)`)
+        addTrace('profile_load', 'completed', `Loaded solar profile for ${p.city} (${p.monthlyUnitsKwh ?? 'units not set'} kWh/mo)`)
       } else {
-        addTrace('profile_load', 'completed', 'No custom profile found. Using regional Hyderabad benchmark defaults.')
+        addTrace('profile_load', 'completed', 'No solar profile found. Personalised numbers need the user to provide their inputs.')
       }
     } catch {
-      addTrace('profile_load', 'failed', 'Could not load profile. Proceeding with defaults.')
+      addTrace('profile_load', 'failed', 'Could not load profile. Proceeding without personalisation.')
     }
   }
 
@@ -99,7 +100,6 @@ export async function runSolarAgent(
     retrievedChunks = await searchKnowledgeBase(plan.retrievalQuery || userQuery, {
       topK: 4,
       similarityThreshold: 0.25,
-      organization: plan.retrievalOrgFilter,
     })
     addTrace(
       'retrieval',
@@ -109,8 +109,8 @@ export async function runSolarAgent(
         sources: retrievedChunks.map((c) => `[${c.source.organization}] ${c.source.title} (${(c.similarity * 100).toFixed(1)}%)`),
       }
     )
-  } catch (err: any) {
-    addTrace('retrieval', 'failed', `Knowledge retrieval encountered an error: ${err.message}`)
+  } catch (err) {
+    addTrace('retrieval', 'failed', `Knowledge retrieval encountered an error: ${errorMessage(err)}`)
   }
 
   const citations = extractCitations(retrievedChunks)
@@ -131,9 +131,15 @@ export async function runSolarAgent(
     ? `\n### USER SOLAR PROFILE:\n${JSON.stringify(userProfile, null, 2)}`
     : ''
 
+  const missingInputsContext =
+    plan.missingInputs.length > 0
+      ? `\n### MISSING USER INPUTS (ask for these; do NOT assume or invent values):\n- ${plan.missingInputs.join('\n- ')}`
+      : ''
+
   const promptContent = `USER QUESTION:
 "${userQuery}"
 ${userProfileContext}
+${missingInputsContext}
 ${toolResultsContext}
 
 ### AUTHORITATIVE KNOWLEDGE BASE SOURCES:
@@ -148,8 +154,8 @@ Please generate an answer grounded in the sources and tool calculations above. A
       { systemPrompt: SYSTEM_PROMPTS.solarAdvisor, temperature: 0.2 }
     )
     addTrace('synthesis', 'completed', 'AI synthesis completed successfully.')
-  } catch (llmErr: any) {
-    addTrace('synthesis', 'failed', `LLM synthesis failed: ${llmErr.message}. Generating deterministic fallback report.`)
+  } catch (llmErr) {
+    addTrace('synthesis', 'failed', `LLM synthesis failed: ${errorMessage(llmErr)}. Generating deterministic fallback report.`)
     // Deterministic fallback response if LLM API is unavailable/offline
     candidateAnswer = generateFallbackDeterministicResponse(userQuery, plan.intent, toolRecords, citations)
   }

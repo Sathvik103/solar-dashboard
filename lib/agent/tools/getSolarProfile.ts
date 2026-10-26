@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { getSolarProfile } from '@/lib/dal/solar-profiles'
+import { errorMessage } from '@/lib/utils'
 
 export const GetSolarProfileSchema = z.object({
   userId: z.string().describe('User ID to fetch solar profile for'),
@@ -13,17 +14,7 @@ export async function getSolarProfileTool(input: GetSolarProfileInput) {
     if (!profile) {
       return {
         found: false,
-        message: 'No solar profile has been created by this user yet. Using regional Hyderabad benchmarks (350 kWh/mo, 800 sq.ft).',
-        fallbackProfile: {
-          city: 'Hyderabad',
-          state: 'Telangana',
-          monthlyUnitsKwh: 350,
-          monthlyBillInr: 2800,
-          roofAreaSqft: 800,
-          roofType: 'flat-concrete',
-          roofOrientation: 'south',
-          shadingLevel: 'none',
-        },
+        message: 'The user has not created a solar profile yet. Ask for monthly units and roof area; do not assume values.',
       }
     }
 
@@ -34,22 +25,25 @@ export async function getSolarProfileTool(input: GetSolarProfileInput) {
         state: profile.state,
         district: profile.district,
         pincode: profile.pincode,
-        monthlyUnitsKwh: profile.monthlyUnitsKwh || 350,
-        monthlyBillInr: profile.monthlyBillInr || 2800,
-        electricityTariffInr: profile.electricityTariffInr || 8.0,
-        roofAreaSqft: profile.roofAreaSqft || 800,
-        roofType: profile.roofType || 'flat-rcc',
-        roofOrientation: profile.roofOrientation || 'south',
-        shadingLevel: profile.shadingLevel || 'none',
+        monthlyUnitsKwh: profile.monthlyUnitsKwh,
+        monthlyBillInr: profile.monthlyBillInr,
+        electricityTariffInr: profile.electricityTariffInr,
+        roofAreaSqft: profile.roofAreaSqft,
+        roofType: profile.roofType,
+        roofOrientation: profile.roofOrientation,
+        shadingLevel: profile.shadingLevel,
         budgetInr: profile.budgetInr,
         preferredCapacityKw: profile.preferredCapacityKw,
         batteryPreference: profile.batteryPreference,
       },
+      missingFields: (['monthlyUnitsKwh', 'roofAreaSqft', 'electricityTariffInr'] as const).filter(
+        (k) => profile[k] == null
+      ),
     }
-  } catch (error: any) {
+  } catch (error) {
     return {
       found: false,
-      error: error.message,
+      error: errorMessage(error),
     }
   }
 }

@@ -61,12 +61,12 @@ export async function upsertSolarProfileAction(
     monthlyUnitsKwh: parseResult.data.monthlyUnitsKwh ?? null,
     electricityTariffInr: parseResult.data.electricityTariffInr ?? null,
     roofAreaSqft: parseResult.data.roofAreaSqft ?? null,
-    roofType: (parseResult.data.roofType as any) || null,
-    roofOrientation: (parseResult.data.roofOrientation as any) || null,
-    shadingLevel: (parseResult.data.shadingLevel as any) || null,
+    roofType: parseResult.data.roofType || null,
+    roofOrientation: parseResult.data.roofOrientation || null,
+    shadingLevel: parseResult.data.shadingLevel || null,
     budgetInr: parseResult.data.budgetInr ?? null,
     preferredCapacityKw: parseResult.data.preferredCapacityKw ?? null,
-    batteryPreference: (parseResult.data.batteryPreference as any) || 'no-battery',
+    batteryPreference: parseResult.data.batteryPreference || 'no-battery',
   }
 
   try {

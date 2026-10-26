@@ -1,7 +1,7 @@
 export type ExtractedDocument = {
   text: string
   numPages: number
-  info?: Record<string, any>
+  info?: Record<string, unknown>
 }
 
 /**
@@ -11,14 +11,15 @@ export async function extractTextFromPdf(pdfBuffer: Buffer): Promise<ExtractedDo
   try {
     // Dynamic import to support both CJS and ESM environments cleanly
     const pdfParseModule = await import('pdf-parse')
-    const pdfParse = (pdfParseModule as any).default || pdfParseModule
+    const pdfParse = ((pdfParseModule as unknown as { default?: typeof pdfParseModule }).default ||
+      pdfParseModule) as unknown as (b: Buffer) => Promise<{ text?: string; numpages?: number; info?: Record<string, unknown> }>
     const data = await pdfParse(pdfBuffer)
     return {
       text: data.text || '',
       numPages: data.numpages || 1,
       info: data.info || {},
     }
-  } catch (error: any) {
-    throw new Error(`Failed to parse PDF document: ${error.message || error}`)
+  } catch (error) {
+    throw new Error(`Failed to parse PDF document: ${error instanceof Error ? error.message : String(error)}`)
   }
 }

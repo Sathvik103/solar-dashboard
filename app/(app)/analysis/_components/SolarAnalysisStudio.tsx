@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import {
   Sun,
   Zap,
@@ -8,14 +8,12 @@ import {
   ShieldCheck,
   TrendingUp,
   Leaf,
-  Calendar,
   Layers,
   ArrowRight,
   Sparkles,
   Sliders,
   CheckCircle2,
-  AlertTriangle,
-} from 'lucide-react'
+  } from 'lucide-react'
 import {
   ResponsiveContainer,
   AreaChart,
@@ -36,22 +34,45 @@ import { Badge } from '@/components/ui/badge'
 import { calculateOptimalSystemSize } from '@/lib/calculations/systemSizing'
 import { calculate25YearSavings } from '@/lib/calculations/financial'
 import { runSolarMLInference } from '@/lib/ml/inference'
+import type { MonthlyClimateInput } from '@/lib/ml/features'
 import Link from 'next/link'
+import type { SolarProfile } from '@/lib/types/user'
 
-export default function SolarAnalysisStudio({ initialProfile }: { initialProfile?: any }) {
+function toStudioShading(level?: string | null): 'none' | 'partial' | 'heavy' {
+  if (level === 'heavy' || level === 'high') return 'heavy'
+  if (level === 'partial' || level === 'medium' || level === 'low') return 'partial'
+  return 'none'
+}
+
+export default function SolarAnalysisStudio({ initialProfile }: { initialProfile?: SolarProfile | null }) {
   const [monthlyUnits, setMonthlyUnits] = useState(
-    initialProfile?.monthlyUnitsKwh ?? initialProfile?.monthly_units_kwh ?? 350
+    initialProfile?.monthlyUnitsKwh ?? 350
   )
   const [monthlyBill, setMonthlyBill] = useState(
-    initialProfile?.monthlyBillInr ?? initialProfile?.monthly_bill_inr ?? 2800
+    initialProfile?.monthlyBillInr ?? 2800
   )
   const [roofArea, setRoofArea] = useState(
-    initialProfile?.roofAreaSqft ?? initialProfile?.roof_area_sqft ?? 800
+    initialProfile?.roofAreaSqft ?? 800
   )
   const [shading, setShading] = useState<'none' | 'partial' | 'heavy'>(
-    (initialProfile?.shadingLevel || initialProfile?.shading_level || 'none') as any
+    toStudioShading(initialProfile?.shadingLevel)
   )
-  const [orientation, setOrientation] = useState<'south' | 'east' | 'west'>('south')
+  const [orientation] = useState<'south' | 'east' | 'west'>('south')
+  const [climate, setClimate] = useState<{ place: string; monthly: MonthlyClimateInput[] } | null>(null)
+
+  // Prefer measured local climatology; the offline reference table is used only if this fails.
+  useEffect(() => {
+    let cancelled = false
+    fetch('/api/climate')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (!cancelled && d?.monthly?.length === 12) setClimate({ place: d.place, monthly: d.monthly })
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   // Calculate Deterministic Sizing & Economics
   const sizing = useMemo(() => {
@@ -70,8 +91,9 @@ export default function SolarAnalysisStudio({ initialProfile }: { initialProfile
       roofAreaSqft: roofArea,
       orientation,
       shadingLevel: shading,
+      climate: climate?.monthly,
     })
-  }, [sizing.recommendedCapacityKw, roofArea, orientation, shading])
+  }, [sizing.recommendedCapacityKw, roofArea, orientation, shading, climate])
 
   // 25-Year Financial Cashflow Projection
   const financialCashflows = useMemo(() => {
@@ -96,11 +118,11 @@ export default function SolarAnalysisStudio({ initialProfile }: { initialProfile
                 <span>Interactive Solar Studio & Proposal Sizing</span>
               </CardTitle>
               <CardDescription>
-                Live simulation engine combining deterministic sizing, TSSPDCL tariffs, PM Surya Ghar subsidies, and regional ML insolation models.
+                What-if simulator combining deterministic sizing, Telangana tariffs, PM Surya Ghar subsidies and a physics-based yield estimate. Inputs start from your profile; edit them to explore scenarios.
               </CardDescription>
             </div>
             <Badge className="bg-emerald-600 font-mono text-xs">
-              Deccan Climate v1.2
+              {climate ? `Measured climate: ${climate.place}` : 'Reference climate (offline)'}
             </Badge>
           </div>
         </CardHeader>
@@ -141,7 +163,7 @@ export default function SolarAnalysisStudio({ initialProfile }: { initialProfile
               <select
                 className="w-full h-9 rounded-md border bg-background px-3 text-xs"
                 value={shading}
-                onChange={(e) => setShading(e.target.value as any)}
+                onChange={(e) => setShading(e.target.value as 'none' | 'partial' | 'heavy')}
               >
                 <option value="none">Zero Shadow (Full Sun)</option>
                 <option value="partial">Partial Shading (~15% loss)</option>
@@ -302,7 +324,7 @@ export default function SolarAnalysisStudio({ initialProfile }: { initialProfile
                   <CartesianGrid strokeDasharray="3 3" opacity={0.15} />
                   <XAxis dataKey="year" tickFormatter={(y) => `Yr ${y}`} tick={{ fontSize: 11 }} />
                   <YAxis tickFormatter={(val) => `₹${(val / 1000).toFixed(0)}k`} tick={{ fontSize: 11 }} />
-                  <Tooltip formatter={(val: any) => `₹${Number(val).toLocaleString()}`} />
+                  <Tooltip formatter={(val) => `₹${Number(val).toLocaleString()}`} />
                   <Legend />
                   <Bar dataKey="cumulativeSavingsInr" name="Cumulative Savings" fill="#10b981" radius={[4, 4, 0, 0]} />
                   <Bar dataKey="netCashflowInr" name="Net Profit" fill="#f59e0b" radius={[4, 4, 0, 0]} />

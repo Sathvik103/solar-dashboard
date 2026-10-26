@@ -40,7 +40,7 @@ export type DocumentChunk = {
   tokenCount: number
   pageNumber: number | null
   sectionTitle: string | null
-  metadata: Record<string, any>
+  metadata: Record<string, unknown>
   embedding?: number[]
   createdAt: string
   updatedAt: string

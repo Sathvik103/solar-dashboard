@@ -1,10 +1,12 @@
 import 'server-only'
 
 import { createSupabaseServerClient } from '@/lib/db/client'
+import type { Database } from '@/lib/types/supabase'
 import { requireUser } from '@/lib/auth/session'
 import type { SolarProfile, SolarProfileInput, RoofType, RoofOrientation, ShadingLevel, BatteryPreference } from '@/lib/types/user'
+import { errorMessage } from '@/lib/utils'
 
-function mapRowToDTO(row: any): SolarProfile {
+function mapRowToDTO(row: Database['public']['Tables']['solar_profiles']['Row']): SolarProfile {
   return {
     id: row.id,
     userId: row.user_id,
@@ -45,8 +47,8 @@ export async function getSolarProfile(userId: string): Promise<SolarProfile | nu
     }
 
     return mapRowToDTO(data)
-  } catch (err: any) {
-    if (err.message === 'Failed to retrieve solar profile') throw err
+  } catch (err) {
+    if (errorMessage(err) === 'Failed to retrieve solar profile') throw err
     return null
   }
 }

@@ -1,4 +1,4 @@
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import OutputChart from '@/components/charts/OutputChart'
@@ -10,15 +10,13 @@ import Link from 'next/link'
 import {
   Sun,
   Zap,
-  TrendingUp,
   IndianRupee,
   Leaf,
   Sparkles,
   Sliders,
   ArrowRight,
   BookOpen,
-  ShieldCheck,
-} from 'lucide-react'
+  } from 'lucide-react'
 
 export default async function DashboardPage() {
   const user = await requireUser()
@@ -142,7 +140,7 @@ export default async function DashboardPage() {
           <Card className="hover:border-emerald-500/40 transition-colors">
             <CardHeader className="pb-2">
               <CardTitle className="text-xs text-muted-foreground font-medium flex items-center justify-between">
-                <span>Today's Generation</span>
+                <span>Today&apos;s Generation</span>
                 <Sun className="h-4 w-4 text-amber-500" />
               </CardTitle>
             </CardHeader>

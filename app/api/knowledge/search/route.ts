@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { requireUser } from '@/lib/dal/users'
 import { KnowledgeSearchSchema } from '@/lib/validations/knowledge'
 import { searchKnowledgeBase } from '@/lib/rag/retrieval'
+import { errorMessage } from '@/lib/utils'
 
 export async function POST(request: Request) {
   try {
@@ -38,9 +39,9 @@ export async function POST(request: Request) {
     })
 
     return NextResponse.json({ results })
-  } catch (error: any) {
+  } catch (error) {
     return NextResponse.json(
-      { error: error.message || 'Knowledge base retrieval failed' },
+      { error: errorMessage(error) || 'Knowledge base retrieval failed' },
       { status: 500 }
     )
   }

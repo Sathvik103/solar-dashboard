@@ -43,7 +43,7 @@ export const MLPredictionIngestSchema = z.object({
   unit: z.string().default('kWh'),
   model_version: z.string().default('python_forecast_v1'),
   confidence: z.number().min(0).max(1).optional().describe('Confidence interval / probability score (0.0 to 1.0)'),
-  metadata: z.record(z.string(), z.any()).optional().describe('Arbitrary hyperparameters, confidence bounds, or feature importances'),
+  metadata: z.record(z.string(), z.unknown()).optional().describe('Arbitrary hyperparameters, confidence bounds, or feature importances'),
 })
 
 export type MLPredictionIngest = z.infer<typeof MLPredictionIngestSchema>

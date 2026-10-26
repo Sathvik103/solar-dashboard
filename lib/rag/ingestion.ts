@@ -5,7 +5,7 @@ import { createClient } from '@supabase/supabase-js'
 import { AI_CONFIG } from '@/lib/ai/config'
 import { generateEmbeddingsBatch } from '@/lib/ai/embeddings'
 import { chunkDocument } from '@/lib/rag/chunker'
-import type { KnowledgeDocument, DocumentStatus } from '@/lib/types/rag'
+import type { DocumentStatus } from '@/lib/types/rag'
 
 export type IngestDocumentInput = {
   title: string

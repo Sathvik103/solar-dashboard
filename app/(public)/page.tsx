@@ -9,11 +9,8 @@ import {
   ShieldCheck,
   Cpu,
   BookOpen,
-  TrendingUp,
   ArrowRight,
-  Zap,
-  CheckCircle2,
-} from 'lucide-react'
+  } from 'lucide-react'
 
 export const metadata = {
   title: 'Solar Intelligence Platform — Telangana Rooftop Solar Planning',

@@ -44,7 +44,7 @@ export function runSolarMLInference(
   let lowVal = Infinity
 
   for (let m = 0; m < 12; m++) {
-    const climate = REGIONAL_METEOROLOGICAL_DATA[m]
+    const climate = params.climate?.length === 12 ? params.climate[m] : REGIONAL_METEOROLOGICAL_DATA[m]
     const features = extractSolarFeatureVector({
       ...params,
       monthIndex: m,

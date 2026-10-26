@@ -11,7 +11,11 @@ export type RawSolarFeatures = {
   shadingLevel?: 'none' | 'partial' | 'heavy'
   monthIndex: number // 0 to 11
   averageDailyTempCelsius?: number
+  /** Measured monthly climate (12 entries, Jan-Dec). Falls back to the reference table when omitted. */
+  climate?: MonthlyClimateInput[]
 }
+
+export type MonthlyClimateInput = { month: string; ghi: number; avgTempC: number }
 
 export type NormalizedFeatureVector = number[]
 
@@ -36,7 +40,7 @@ export const REGIONAL_METEOROLOGICAL_DATA = [
  */
 export function extractSolarFeatureVector(raw: RawSolarFeatures): NormalizedFeatureVector {
   const monthIdx = Math.max(0, Math.min(11, raw.monthIndex))
-  const climate = REGIONAL_METEOROLOGICAL_DATA[monthIdx]
+  const climate = raw.climate?.length === 12 ? raw.climate[monthIdx] : REGIONAL_METEOROLOGICAL_DATA[monthIdx]
 
   // Feature 0: Capacity (kW)
   const f_capacity = raw.capacityKw

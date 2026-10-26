@@ -5,14 +5,10 @@ import {
   Search,
   ExternalLink,
   BookOpen,
-  Filter,
-  CheckCircle2,
   AlertCircle,
   BarChart3,
   Sparkles,
-  Layers,
-  Cpu,
-} from 'lucide-react'
+  } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -20,6 +16,18 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Badge } from '@/components/ui/badge'
 import { TELANGANA_EVALUATION_QUERIES } from '@/lib/rag/evaluationQueries'
 import type { RetrievalResult } from '@/lib/types/rag'
+import { errorMessage } from '@/lib/utils'
+
+type EvalResponse = {
+  ragEvaluation?: {
+    hitRate?: number
+    hitCount?: number
+    totalQueries?: number
+    top1Accuracy?: number
+    top3Accuracy?: number
+    mrr?: number
+  }
+}
 
 export default function KnowledgeSearchBench() {
   const [query, setQuery] = useState('')
@@ -32,7 +40,7 @@ export default function KnowledgeSearchBench() {
 
   // Evaluation benchmark state
   const [evalLoading, setEvalLoading] = useState(false)
-  const [evalData, setEvalData] = useState<any | null>(null)
+  const [evalData, setEvalData] = useState<EvalResponse | null>(null)
 
   async function handleSearch(searchQuery?: string) {
     const q = searchQuery || query
@@ -59,8 +67,8 @@ export default function KnowledgeSearchBench() {
         throw new Error(data.error || 'Failed to execute knowledge search')
       }
       setResults(data.results || [])
-    } catch (err: any) {
-      setError(err.message || 'An unexpected error occurred')
+    } catch (err) {
+      setError(errorMessage(err) || 'An unexpected error occurred')
     } finally {
       setLoading(false)
     }
@@ -111,7 +119,7 @@ export default function KnowledgeSearchBench() {
 
       {/* Live Evaluation Results (When Run) */}
       {evalData && (
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 animate-in fade-in duration-300">
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 animate-in fade-in duration-300">
           <Card>
             <CardContent className="p-4 text-center space-y-1">
               <span className="text-xs text-muted-foreground font-medium">Retrieval Hit Rate</span>
@@ -139,17 +147,6 @@ export default function KnowledgeSearchBench() {
                 {evalData.ragEvaluation?.mrr || 0}
               </div>
               <span className="text-[10px] text-muted-foreground">MRR across 30 queries</span>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4 text-center space-y-1">
-              <span className="text-xs text-muted-foreground font-medium">ML Model R² Score</span>
-              <div className="text-2xl font-black text-emerald-600">
-                {evalData.mlEvaluation?.r2Score || 0.94}
-              </div>
-              <span className="text-[10px] text-muted-foreground">
-                MAE: {evalData.mlEvaluation?.meanAbsoluteErrorKwh || 14.2} kWh
-              </span>
             </CardContent>
           </Card>
         </div>

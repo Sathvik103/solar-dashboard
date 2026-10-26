@@ -2,6 +2,7 @@ import 'server-only'
 
 import { GoogleGenAI } from '@google/genai'
 import { AI_CONFIG } from '@/lib/ai/config'
+import { errorMessage } from '@/lib/utils'
 
 function getGeminiApiKey(): string {
   const key = process.env.GEMINI_API_KEY || process.env.GOOGLE_GENAI_API_KEY
@@ -42,8 +43,8 @@ export async function generateEmbedding(text: string): Promise<number[]> {
     }
 
     return embedding
-  } catch (error: any) {
-    if (error.message?.includes('outputDimensionality')) {
+  } catch (error) {
+    if (errorMessage(error)?.includes('outputDimensionality')) {
       // Fallback try text-embedding-004 without explicit config override if needed
       const response = await ai.models.embedContent({
         model: 'text-embedding-004',
@@ -57,7 +58,7 @@ export async function generateEmbedding(text: string): Promise<number[]> {
         return embedding
       }
     }
-    throw new Error(`Failed to generate Gemini embedding: ${error.message || error}`)
+    throw new Error(`Failed to generate Gemini embedding: ${errorMessage(error) || error}`)
   }
 }
 

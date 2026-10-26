@@ -1,6 +1,7 @@
 import 'server-only'
 
 import { searchKnowledgeBase } from '@/lib/rag/retrieval'
+import type { RetrievalResult } from '@/lib/types/rag'
 import {
   TELANGANA_EVALUATION_QUERIES,
   type EvaluationQuery,
@@ -57,7 +58,7 @@ export async function runRetrievalEvaluation(
   let totalTopScoreSum = 0
 
   for (const evalQuery of queries) {
-    let retrieved: any[] = []
+    let retrieved: RetrievalResult[] = []
     try {
       retrieved = await searchKnowledgeBase(evalQuery.query, {
         topK: 5,

@@ -1,6 +1,7 @@
 import 'server-only'
 
 import { GoogleGenAI } from '@google/genai'
+import { errorMessage } from '@/lib/utils'
 
 function getGeminiApiKey(): string | null {
   return process.env.GEMINI_API_KEY || process.env.GOOGLE_GENAI_API_KEY || null
@@ -63,7 +64,7 @@ export async function generateLLMResponse(
       throw new Error('Gemini API returned an empty response text')
     }
     return text
-  } catch (error: any) {
+  } catch (error) {
     if (modelName !== FALLBACK_MODEL) {
       // Retry once with fallback model
       try {
@@ -76,11 +77,11 @@ export async function generateLLMResponse(
           },
         })
         if (fallbackRes.text) return fallbackRes.text
-      } catch (fallbackErr: any) {
-        throw new Error(`Gemini LLM generation failed: ${fallbackErr.message || error.message}`)
+      } catch (fallbackErr) {
+        throw new Error(`Gemini LLM generation failed: ${errorMessage(fallbackErr) || errorMessage(error)}`)
       }
     }
-    throw new Error(`Gemini LLM generation failed: ${error.message || error}`)
+    throw new Error(`Gemini LLM generation failed: ${errorMessage(error) || error}`)
   }
 }
 
@@ -123,8 +124,8 @@ export async function* streamLLMResponse(
         yield chunk.text
       }
     }
-  } catch (error: any) {
+  } catch (error) {
     // If stream fails, yield fallback error message
-    throw new Error(`Streaming failed: ${error.message || error}`)
+    throw new Error(`Streaming failed: ${errorMessage(error) || error}`)
   }
 }

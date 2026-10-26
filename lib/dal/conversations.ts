@@ -2,6 +2,7 @@ import 'server-only'
 
 import { createSupabaseServerClient } from '@/lib/db/client'
 import { requireUser } from './users'
+import type { Json } from '@/lib/types/supabase'
 
 export type ConversationRecord = {
   id: string
@@ -17,9 +18,9 @@ export type MessageRecord = {
   userId: string
   role: 'user' | 'assistant' | 'system' | 'tool'
   content: string
-  citations: any[]
-  toolCalls: any[]
-  traceEvents: any[]
+  citations: unknown[]
+  toolCalls: unknown[]
+  traceEvents: unknown[]
   createdAt: string
 }
 
@@ -96,11 +97,11 @@ export async function getConversationMessages(conversationId: string): Promise<M
     id: m.id,
     conversationId: m.conversation_id,
     userId: m.user_id,
-    role: m.role as any,
+    role: m.role as MessageRecord['role'],
     content: m.content,
-    citations: (m.citations as any) || [],
-    toolCalls: (m.tool_calls as any) || [],
-    traceEvents: (m.trace_events as any) || [],
+    citations: (m.citations as unknown[] | null) || [],
+    toolCalls: (m.tool_calls as unknown[] | null) || [],
+    traceEvents: (m.trace_events as unknown[] | null) || [],
     createdAt: m.created_at,
   }))
 }
@@ -112,7 +113,7 @@ export async function addConversationMessage(
   conversationId: string,
   role: 'user' | 'assistant' | 'system' | 'tool',
   content: string,
-  extra: { citations?: any[]; toolCalls?: any[]; traceEvents?: any[] } = {}
+  extra: { citations?: unknown[]; toolCalls?: unknown[]; traceEvents?: unknown[] } = {}
 ): Promise<void> {
   const user = await requireUser()
   const supabase = await createSupabaseServerClient()
@@ -122,9 +123,9 @@ export async function addConversationMessage(
     user_id: user.id,
     role,
     content,
-    citations: extra.citations || [],
-    tool_calls: extra.toolCalls || [],
-    trace_events: extra.traceEvents || [],
+    citations: (extra.citations || []) as Json,
+    tool_calls: (extra.toolCalls || []) as Json,
+    trace_events: (extra.traceEvents || []) as Json,
   })
 
   // Update conversation updated_at

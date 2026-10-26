@@ -15,7 +15,7 @@ export async function executeVectorSearch(
   const supabase = await createSupabaseServerClient()
 
   const { data, error } = await supabase.rpc('match_document_chunks', {
-    query_embedding: queryEmbedding as any,
+    query_embedding: queryEmbedding as unknown as string,
     match_count: topK,
     similarity_threshold: similarityThreshold,
     filter_location_scope: options.locationScope || null,
@@ -31,7 +31,7 @@ export async function executeVectorSearch(
     return []
   }
 
-  return data.map((row: any) => ({
+  return data.map((row) => ({
     chunkId: row.chunk_id,
     documentId: row.document_id,
     content: row.content,

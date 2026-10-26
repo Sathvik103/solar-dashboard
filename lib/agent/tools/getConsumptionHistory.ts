@@ -6,7 +6,7 @@ export const GetConsumptionHistorySchema = z.object({})
 
 export type GetConsumptionHistoryInput = z.infer<typeof GetConsumptionHistorySchema>
 
-export async function getConsumptionHistoryTool(_input: GetConsumptionHistoryInput) {
+export async function getConsumptionHistoryTool() {
   try {
     const history = await getUserConsumptionHistory()
     if (history.length === 0) {

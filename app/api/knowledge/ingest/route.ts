@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { requireUser } from '@/lib/dal/users'
 import { isKnowledgeAdmin, ingestDocument } from '@/lib/rag/ingestion'
 import { KnowledgeIngestSchema } from '@/lib/validations/knowledge'
+import { errorMessage } from '@/lib/utils'
 
 export async function POST(request: Request) {
   let user
@@ -41,9 +42,9 @@ export async function POST(request: Request) {
       documentId: result.documentId,
       chunkCount: result.chunkCount,
     })
-  } catch (error: any) {
+  } catch (error) {
     return NextResponse.json(
-      { error: error.message || 'Ingestion failed' },
+      { error: errorMessage(error) || 'Ingestion failed' },
       { status: 500 }
     )
   }
