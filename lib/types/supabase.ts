@@ -6,6 +6,15 @@ export type Json =
   | { [key: string]: Json | undefined }
   | Json[]
 
+
+/** Compact table definition: Insert requires only `Req` keys, Update is fully partial. */
+type Tbl<Row, Req extends keyof Row> = {
+  Row: Row
+  Insert: Pick<Row, Req> & Partial<Omit<Row, Req>>
+  Update: Partial<Row>
+  Relationships: []
+}
+
 export interface Database {
   public: {
     Tables: {
@@ -344,6 +353,74 @@ export interface Database {
           }
         ]
       }
+      consumption_history: Tbl<{
+        id: string; user_id: string; record_date: string; month: string; year: number
+        consumption_kwh: number; peak_demand_kw: number | null; bill_amount: number
+        units_imported: number | null; units_exported: number | null; tariff_rate: number | null
+        source: string; created_at: string
+      }, 'user_id' | 'record_date' | 'month' | 'year' | 'consumption_kwh' | 'bill_amount' | 'source'>
+      electricity_bills: Tbl<{
+        id: string; user_id: string; billing_period_start: string; billing_period_end: string
+        units_consumed: number; fixed_charge: number; energy_charge: number; taxes: number
+        other_charges: number | null; total_bill: number; tariff_category: string
+        tariff_rate: number; created_at: string
+      }, 'user_id' | 'billing_period_start' | 'billing_period_end' | 'units_consumed' | 'energy_charge' | 'total_bill' | 'tariff_rate'>
+      solar_systems: Tbl<{
+        id: string; user_id: string; capacity_kw: number; panel_count: number | null
+        panel_wattage: number | null; inverter_capacity_kw: number | null; installation_cost: number
+        subsidy_amount: number; net_cost: number; installation_date: string | null
+        installer: string | null; system_status: string; created_at: string
+      }, 'user_id' | 'capacity_kw' | 'installation_cost' | 'net_cost'>
+      solar_generation_history: Tbl<{
+        id: string; user_id: string; system_id: string | null; record_date: string
+        generation_kwh: number; exported_kwh: number; self_consumed_kwh: number
+        grid_import_kwh: number; peak_generation_kw: number | null; solar_irradiance: number | null
+        weather_condition: string | null; source: string; created_at: string
+      }, 'user_id' | 'record_date' | 'generation_kwh' | 'source'>
+      profiles: Tbl<{
+        id: string; full_name: string | null; email: string; phone: string | null; city: string
+        district: string | null; state: string; pincode: string | null
+        latitude: number | null; longitude: number | null; created_at: string; updated_at: string
+      }, 'id' | 'email'>
+      regional_statistics: Tbl<{
+        id: string; state: string; district: string; city: string; pincode: string | null
+        record_date: string; average_solar_irradiance: number; average_generation_per_kw: number
+        average_monthly_consumption: number; average_electricity_tariff: number
+        average_roof_area: number; adoption_rate: number; installed_capacity_mw: number
+        average_system_size_kw: number; average_payback_years: number
+        average_monthly_savings: number; co2_reduction_tonnes: number; source: string
+        created_at: string
+      }, 'district' | 'city' | 'record_date'>
+      tariff_history: Tbl<{
+        id: string; state: string; discom: string; category: string; slab_name: string
+        min_units: number; max_units: number; rate_per_unit: number; effective_from: string
+        effective_to: string | null; source: string; created_at: string
+      }, 'slab_name' | 'min_units' | 'max_units' | 'rate_per_unit' | 'effective_from'>
+      recommendation_history: Tbl<{
+        id: string; user_id: string; query: string; recommended_capacity_kw: number
+        alternative_capacity_kw: number | null; estimated_generation: number
+        estimated_savings: number; net_cost: number; payback_years: number
+        confidence: number | null; reasoning: string; evidence: Json; created_at: string
+      }, 'user_id' | 'query' | 'recommended_capacity_kw' | 'estimated_generation' | 'estimated_savings' | 'net_cost' | 'payback_years' | 'reasoning'>
+      saved_scenarios: Tbl<{
+        id: string; user_id: string; name: string; monthly_consumption_kwh: number
+        monthly_bill_inr: number; roof_area_sqft: number; tariff_inr: number; capacity_kw: number
+        subsidy_inr: number; shading_level: string; calculated_savings_inr: number
+        calculated_payback_years: number; created_at: string
+      }, 'user_id' | 'name' | 'monthly_consumption_kwh' | 'monthly_bill_inr' | 'roof_area_sqft' | 'capacity_kw' | 'calculated_savings_inr' | 'calculated_payback_years'>
+      dashboard_preferences: Tbl<{
+        id: string; user_id: string; enabled_widgets: Json; created_at: string; updated_at: string
+      }, 'user_id'>
+      ml_datasets: Tbl<{
+        id: string; user_id: string | null; dataset_type: string; feature_schema: Json
+        record_count: number; date_range_start: string | null; date_range_end: string | null
+        source: string; created_at: string
+      }, 'dataset_type'>
+      ml_predictions: Tbl<{
+        id: string; user_id: string; prediction_type: string; prediction_date: string
+        predicted_value: number; actual_value: number | null; unit: string; model_version: string
+        confidence: number | null; metadata: Json | null; created_at: string
+      }, 'user_id' | 'prediction_type' | 'prediction_date' | 'predicted_value'>
     }
     Views: {
       [_ in never]: never

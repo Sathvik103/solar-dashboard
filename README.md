@@ -1,36 +1,49 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Solar Intelligence Platform
 
-## Getting Started
+Next.js 16 + Supabase app that helps Telangana households size, price and monitor rooftop solar.
 
-First, run the development server:
+## Where the numbers come from
+
+Nothing on the dashboard is hard-coded or randomly generated.
+
+| Figure | Source |
+| --- | --- |
+| Hourly output / today's kWh | Physics PV model (`lib/solar/pvModel.ts`) driven by live plane-of-array irradiance and temperature from [Open-Meteo](https://open-meteo.com) for your city. Labelled "modelled". |
+| Logged generation, exports, imports | Entered by you (form or CSV) on **History** → `solar_generation_history`. |
+| Consumption, bills, tariff | Entered by you / CSV → `consumption_history`. Tariff = profile value, else bill-derived, else the slab model. |
+| Monthly climatology | ERA5 reanalysis via Open-Meteo archive (3-year mean). |
+| Forecast metrics (MAE/RMSE/R²) | Computed from real `ml_predictions` prediction/actual pairs only. |
+| Regulations / subsidy answers | RAG over ingested TGERC / TGREDCO / MNRE documents with citations. |
+
+When data is missing the UI says so (empty states, `—`) instead of substituting defaults.
+
+## Setup
 
 ```bash
+cp .env.example .env.local   # fill in Supabase + GEMINI_API_KEY
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Apply `supabase/migrations/*.sql` in order (001–006). Run `npm run ingest:knowledge` once to load the knowledge base.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Scripts
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+`npm run dev | build | start | lint | test | test:coverage`
 
-## Learn More
+## Operations
 
-To learn more about Next.js, take a look at the following resources:
+- `GET /api/health` returns 200 / 503 with a database check (use for uptime monitors).
+- All data APIs require a session and return `Cache-Control: private, no-store`.
+- `POST /api/chat` requires sign-in, caps messages at 2000 chars and is rate-limited to 20/min/user
+  (in-memory per instance; replace `lib/rate-limit.ts` with a Redis store for a global limit).
+- `proxy.ts` (Next 16 successor to `middleware.ts`) gates app routes; security headers are set in `next.config.ts`.
+- `GET /api/ml/dataset` exports the user's real history for the external Python pipeline — see `docs/ml-integration.md`.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Known limitations
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- Live inverter telemetry is not integrated; "current power" is a weather-model estimate. Connect an inverter API
+  (e.g. via `upsertGenerationRecords(..., 'inverter_telemetry')`) to replace manual logs.
+- Telangana tariff slabs in `lib/calculations/tariffs.ts` and PM Surya Ghar subsidy tiers in `systemSizing.ts` are
+  coded constants; verify against the current TGERC order and MNRE circular before relying on quotes.
+- `public.regional_statistics` is intentionally empty; populate it only from a cited official source.

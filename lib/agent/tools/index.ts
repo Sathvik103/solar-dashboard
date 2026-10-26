@@ -8,6 +8,9 @@ import { getTariffInformationTool, GetTariffInformationSchema } from './getTarif
 import { compareSystemsTool, CompareSystemsSchema } from './compareSystems'
 import { searchKnowledgeTool, SearchKnowledgeSchema } from './searchKnowledge'
 import { createSolarPlanTool, CreateSolarPlanSchema } from './createSolarPlan'
+import { getConsumptionHistoryTool, GetConsumptionHistorySchema } from './getConsumptionHistory'
+import { getRegionalStatisticsTool, GetRegionalStatisticsSchema } from './getRegionalStatistics'
+import { getMLPredictionsTool, GetMLPredictionsSchema } from './getMLPredictions'
 
 export type AgentToolDefinition = {
   name: string
@@ -76,5 +79,23 @@ export const AGENT_TOOLS: Record<string, AgentToolDefinition> = {
     description: 'Generates a full end-to-end solar proposal with recommended capacity, financial metrics, roadmap steps, and required documents.',
     schema: CreateSolarPlanSchema,
     execute: createSolarPlanTool,
+  },
+  getConsumptionHistory: {
+    name: 'getConsumptionHistory',
+    description: "Summarises the signed-in user's recorded monthly electricity bills (never invented; reports when none exist).",
+    schema: GetConsumptionHistorySchema,
+    execute: getConsumptionHistoryTool,
+  },
+  getRegionalStatistics: {
+    name: 'getRegionalStatistics',
+    description: 'Measured monthly solar irradiance and temperature (ERA5) for a Telangana district, plus curated regional statistics when available.',
+    schema: GetRegionalStatisticsSchema,
+    execute: getRegionalStatisticsTool,
+  },
+  getMLPredictions: {
+    name: 'getMLPredictions',
+    description: 'Reads forecasts produced by the external ML pipeline for the signed-in user; reports when none exist.',
+    schema: GetMLPredictionsSchema,
+    execute: getMLPredictionsTool,
   },
 }

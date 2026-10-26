@@ -1,13 +1,11 @@
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { generateDashboardData } from '@/lib/solarData'
 import OutputChart from '@/components/charts/OutputChart'
 import { AnimatedCard, AnimatedContainer } from '@/components/AnimatedCard'
 import PageWrapper from '@/components/layout/PageWrapper'
 import { requireUser } from '@/lib/dal/users'
-import { getSolarProfile } from '@/lib/dal/solar-profiles'
-import { calculateOptimalSystemSize } from '@/lib/calculations/systemSizing'
+import { buildDashboardOverview } from '@/lib/dashboard/overview'
 import Link from 'next/link'
 import {
   Sun,
@@ -24,16 +22,13 @@ import {
 
 export default async function DashboardPage() {
   const user = await requireUser()
-  const profile = await getSolarProfile(user.id)
-  const data = generateDashboardData()
-
-  const monthlyUnits = profile?.monthlyUnitsKwh || 350
-  const roofArea = profile?.roofAreaSqft || 800
-  const sizing = calculateOptimalSystemSize({
-    monthlyUnitsKwh: monthlyUnits,
-    monthlyBillInr: profile?.monthlyBillInr || 2800,
-    roofAreaSqft: roofArea,
-  })
+  const overview = await buildDashboardOverview(user.id)
+  const { profile, sizing, today, basis, tariffInrPerKwh } = overview
+  const monthlyUnits = overview.stats.averageMonthlyConsumption ?? profile?.monthlyUnitsKwh ?? null
+  const measured = today.loggedKwh
+  const todayKwh = measured ?? today.modelledKwh
+  const todaySaved = todayKwh != null && tariffInrPerKwh != null ? todayKwh * tariffInrPerKwh : null
+  const estimateTag = measured == null ? 'Modelled estimate' : 'Logged reading'
 
   return (
     <PageWrapper>
@@ -43,11 +38,11 @@ export default async function DashboardPage() {
           <h1 className="text-2xl font-bold tracking-tight text-foreground flex items-center gap-2">
             <span>Solar Intelligence Dashboard</span>
             <Badge className="bg-emerald-600 font-mono text-xs">
-              {profile?.city || 'Hyderabad'}, Telangana
+              {profile?.city || 'Set location'}{profile?.state ? `, ${profile.state}` : ''}
             </Badge>
           </h1>
           <p className="text-xs text-muted-foreground mt-1">
-            Real-time monitoring, deterministic generation telemetry, and agentic solar planning.
+            Output modelled from live weather for your system, plus the readings and bills you log.
           </p>
         </div>
 
@@ -67,35 +62,60 @@ export default async function DashboardPage() {
         </div>
       </div>
 
-      {/* AI Recommendation Banner */}
-      <Card className="border-emerald-500/30 bg-gradient-to-r from-emerald-950/30 via-emerald-900/10 to-transparent">
-        <CardContent className="p-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-          <div className="flex items-start gap-3">
-            <div className="h-10 w-10 rounded-xl bg-emerald-500/20 text-emerald-500 flex items-center justify-center shrink-0 border border-emerald-500/30">
-              <Sparkles className="h-5 w-5" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="font-bold text-sm text-foreground">
-                  Personalized Recommendation: {sizing.recommendedCapacityKw} kW System
-                </span>
-                <Badge variant="outline" className="text-[10px] bg-emerald-50 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
-                  PM Surya Ghar Subsidy: ₹{sizing.subsidyAmountInr.toLocaleString()}
-                </Badge>
+      {/* Recommendation / onboarding */}
+      {sizing ? (
+        <Card className="border-emerald-500/30 bg-gradient-to-r from-emerald-950/30 via-emerald-900/10 to-transparent">
+          <CardContent className="p-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+            <div className="flex items-start gap-3">
+              <div className="h-10 w-10 rounded-xl bg-emerald-500/20 text-emerald-500 flex items-center justify-center shrink-0 border border-emerald-500/30">
+                <Sparkles className="h-5 w-5" />
               </div>
+              <div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="font-bold text-sm text-foreground">
+                    Recommendation: {sizing.recommendedCapacityKw} kW System
+                  </span>
+                  <Badge variant="outline" className="text-[10px] bg-emerald-50 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
+                    PM Surya Ghar Subsidy: ₹{sizing.subsidyAmountInr.toLocaleString('en-IN')}
+                  </Badge>
+                </div>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Based on your {monthlyUnits} kWh/month {overview.hasConsumptionData ? 'billing history' : 'profile'}, this saves ~₹
+                  {sizing.estimatedAnnualSavingsInr.toLocaleString('en-IN')}/yr with a payback of {sizing.paybackPeriodYears} years.
+                </p>
+              </div>
+            </div>
+            <Link href="/analysis">
+              <Button size="sm" variant="secondary" className="text-xs gap-1 shrink-0 h-8 font-medium">
+                <span>View Full Proposal</span>
+                <ArrowRight className="h-3 w-3" />
+              </Button>
+            </Link>
+          </CardContent>
+        </Card>
+      ) : (
+        <Card className="border-amber-500/30 bg-amber-500/5">
+          <CardContent className="p-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-3">
+            <div>
+              <p className="font-bold text-sm">Add your data to get started</p>
               <p className="text-xs text-muted-foreground mt-0.5">
-                Based on your {monthlyUnits} kWh/month consumption, a {sizing.recommendedCapacityKw} kW installation saves ~₹{sizing.estimatedAnnualSavingsInr.toLocaleString()}/yr with a payback of {sizing.paybackPeriodYears} years.
+                Enter your monthly units in your solar profile or add electricity bills. Nothing on this page is
+                shown until it is based on your real inputs.
               </p>
             </div>
-          </div>
-          <Link href="/analysis">
-            <Button size="sm" variant="secondary" className="text-xs gap-1 shrink-0 h-8 font-medium">
-              <span>View Full Proposal</span>
-              <ArrowRight className="h-3 w-3" />
-            </Button>
-          </Link>
-        </CardContent>
-      </Card>
+            <div className="flex gap-2">
+              <Link href="/profile"><Button size="sm" variant="secondary" className="text-xs h-8">Solar profile</Button></Link>
+              <Link href="/history"><Button size="sm" className="text-xs h-8">Add bills</Button></Link>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {!overview.weather.available && basis && (
+        <p role="alert" className="text-xs text-amber-600">
+          Live weather is unavailable right now{overview.weather.error ? ` (${overview.weather.error})` : ''}; modelled output is hidden rather than guessed.
+        </p>
+      )}
 
       {/* Primary KPI Metrics */}
       <AnimatedContainer className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -103,16 +123,16 @@ export default async function DashboardPage() {
           <Card className="hover:border-emerald-500/40 transition-colors">
             <CardHeader className="pb-2">
               <CardTitle className="text-xs text-muted-foreground font-medium flex items-center justify-between">
-                <span>Current Real-time Power</span>
+                <span>Estimated Power Now</span>
                 <Zap className="h-4 w-4 text-amber-500" />
               </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-black text-foreground">
-                {data.currentOutput.toFixed(2)} <span className="text-sm font-normal text-muted-foreground">kW</span>
+                {today.currentKw != null ? today.currentKw.toFixed(2) : '—'} <span className="text-sm font-normal text-muted-foreground">kW</span>
               </div>
               <span className="text-xs text-emerald-600 font-medium mt-1 block">
-                Peak irradiance: 4.8 kWh/m²/day
+                {basis ? `Modelled · ${basis.capacityKw} kW (${basis.kind})` : "Needs system size"}
               </span>
             </CardContent>
           </Card>
@@ -128,10 +148,10 @@ export default async function DashboardPage() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-black text-foreground">
-                {data.todayTotal.toFixed(2)} <span className="text-sm font-normal text-muted-foreground">kWh</span>
+                {todayKwh != null ? todayKwh.toFixed(2) : '—'} <span className="text-sm font-normal text-muted-foreground">kWh</span>
               </div>
               <span className="text-xs text-muted-foreground mt-1 block">
-                Monthly Yield: ~{sizing.estimatedMonthlyGenerationKwh} kWh
+                {todayKwh != null ? estimateTag : 'No data yet'}
               </span>
             </CardContent>
           </Card>
@@ -147,10 +167,10 @@ export default async function DashboardPage() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-black text-emerald-600 dark:text-emerald-400">
-                ₹{data.moneySavedToday.toFixed(2)}
+                ₹{todaySaved != null ? todaySaved.toFixed(2) : '—'}
               </div>
               <span className="text-xs text-muted-foreground mt-1 block">
-                Annual Est: ₹{sizing.estimatedAnnualSavingsInr.toLocaleString()}
+                {tariffInrPerKwh != null ? `@ ₹${tariffInrPerKwh}/kWh` : 'Add a bill for tariff'}
               </span>
             </CardContent>
           </Card>
@@ -160,16 +180,16 @@ export default async function DashboardPage() {
           <Card className="hover:border-emerald-500/40 transition-colors">
             <CardHeader className="pb-2">
               <CardTitle className="text-xs text-muted-foreground font-medium flex items-center justify-between">
-                <span>Carbon Reduction</span>
+                <span>Projected CO₂ avoided / yr</span>
                 <Leaf className="h-4 w-4 text-emerald-600" />
               </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-black text-foreground">
-                {sizing.annualCo2AvoidedKg.toLocaleString()} <span className="text-sm font-normal text-muted-foreground">kg CO2</span>
+                {sizing ? sizing.annualCo2AvoidedKg.toLocaleString('en-IN') : '—'} <span className="text-sm font-normal text-muted-foreground">kg CO2</span>
               </div>
               <span className="text-xs text-emerald-600 font-medium mt-1 block">
-                Equivalent to {sizing.treesEquivalentPlanted} trees planted
+                {sizing ? `≈ ${sizing.treesEquivalentPlanted} trees (0.82 kg/kWh grid factor)` : 'Needs consumption data'}
               </span>
             </CardContent>
           </Card>
@@ -179,7 +199,7 @@ export default async function DashboardPage() {
       {/* Telemetry Chart & Grid Activity */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2">
-          <OutputChart data={data.hourlyData} />
+          <OutputChart data={today.hourly} />
         </div>
 
         <div className="space-y-4">

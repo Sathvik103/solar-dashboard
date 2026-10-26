@@ -2,7 +2,6 @@ import { describe, it, expect } from 'vitest'
 import { extractSolarFeatureVector } from './features'
 import { predictMonthlySolarOutput } from './model'
 import { runSolarMLInference } from './inference'
-import { evaluateSolarMLModel } from './evaluation'
 
 describe('Solar Machine Learning Module', () => {
   it('extracts normalized feature vectors of correct length', () => {
@@ -46,13 +45,5 @@ describe('Solar Machine Learning Module', () => {
       expect(point.lowerBoundKwh).toBeLessThanOrEqual(point.monthlyKwh)
       expect(point.upperBoundKwh).toBeGreaterThanOrEqual(point.monthlyKwh)
     }
-  })
-
-  it('passes model evaluation benchmark metrics (R² > 0.85, MAPE < 10%)', () => {
-    const metrics = evaluateSolarMLModel()
-    expect(metrics.sampleCount).toBeGreaterThan(0)
-    expect(metrics.r2Score).toBeGreaterThan(0.85)
-    expect(metrics.meanAbsolutePercentageErrorPercent).toBeLessThan(10.0)
-    expect(metrics.validationStatus).toBe('passed')
   })
 })

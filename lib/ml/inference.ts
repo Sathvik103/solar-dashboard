@@ -23,8 +23,8 @@ export type SolarMLInferenceResult = {
   capacityUtilizationFactorPercent: number
   monthlyCurve: MonthlyPredictionPoint[]
   modelMetadata: {
-    modelType: 'Ridge-Polynomial Solar Radiation Estimator v1.2'
-    trainingRegion: 'Telangana & Hyderabad (Deccan Plateau)'
+    modelType: 'Physics-based monthly yield estimate (PR 0.76, no fitted coefficients)'
+    trainingRegion: 'Reference Telangana climatology (not trained)'
     featureCount: 6
     confidenceIntervalPercent: 95
   }
@@ -51,7 +51,7 @@ export function runSolarMLInference(
     })
 
     const predKwh = predictMonthlySolarOutput(features)
-    // 95% confidence interval estimation (±4.5% residual uncertainty)
+    // Indicative ±4.5% band for year-to-year irradiance variation (not a statistical CI)
     const lower = Math.round(predKwh * 0.955)
     const upper = Math.round(predKwh * 1.045)
 
@@ -88,8 +88,8 @@ export function runSolarMLInference(
     capacityUtilizationFactorPercent: cuf,
     monthlyCurve,
     modelMetadata: {
-      modelType: 'Ridge-Polynomial Solar Radiation Estimator v1.2',
-      trainingRegion: 'Telangana & Hyderabad (Deccan Plateau)',
+      modelType: 'Physics-based monthly yield estimate (PR 0.76, no fitted coefficients)',
+      trainingRegion: 'Reference Telangana climatology (not trained)',
       featureCount: 6,
       confidenceIntervalPercent: 95,
     },

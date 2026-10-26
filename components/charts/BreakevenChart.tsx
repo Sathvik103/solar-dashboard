@@ -4,7 +4,7 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, ReferenceLine, Tooltip, L
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { ChartContainer } from '@/components/ui/chart'
 import { generateBreakevenCurves } from '@/lib/calculations/solar'
-import { panelTypes } from '@/lib/solarData'
+import { panelTypes } from '@/lib/data/panels'
 
 type Props = {
   numberOfPanels: number
