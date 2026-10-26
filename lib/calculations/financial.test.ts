@@ -9,7 +9,10 @@ import {
 
 describe('Financial Calculation Engine', () => {
   it('calculates PM Surya Ghar subsidies correctly', () => {
+    expect(calculatePMSuryaGharSubsidy(0.5)).toBe(15000)
     expect(calculatePMSuryaGharSubsidy(1)).toBe(30000)
+    expect(calculatePMSuryaGharSubsidy(1.5)).toBe(45000)
+    expect(calculatePMSuryaGharSubsidy(2.5)).toBe(69000)
     expect(calculatePMSuryaGharSubsidy(2)).toBe(60000)
     expect(calculatePMSuryaGharSubsidy(3)).toBe(78000)
     expect(calculatePMSuryaGharSubsidy(5)).toBe(78000)

@@ -1,9 +1,68 @@
 /**
- * tariffs.ts — Telangana electricity tariff slabs & net metering calculation
- * Source: TGERC Retail Supply Tariff Order for TSSPDCL & TSNPDCL
+ * tariffs.ts — Telangana LT-I (Domestic) bill calculation.
+ *
+ * Source: TGSPDCL/TGNPDCL Retail Supply Tariff Schedule, FY 2025-26 (01.05.2025),
+ * retained unchanged by the TGERC Retail Supply Tariff Order for FY 2026-27 (from 01.04.2026).
+ * https://tgsouthernpower.org/currentyeartarifforders
+ *
+ * The LT-I category is chosen by total monthly consumption, and each category has its own
+ * telescopic slab ladder (a 150-unit household is billed on the LT-I(B) ladder from unit 1).
+ * Electricity duty, FSA/FCA and ToD adjustments are billed extra by the DISCOM and are NOT
+ * included; estimates are therefore slightly below a real bill.
  */
 
-export type TariffCategory = 'domestic' | 'commercial' | 'industrial'
+export const TARIFF_SOURCE = {
+  schedule: 'TGSPDCL Retail Supply Tariff Schedule FY 2025-26, retained for FY 2026-27',
+  effectiveFrom: '2026-04-01',
+  url: 'https://tgsouthernpower.org/currentyeartarifforders',
+  excludes: ['Electricity duty (TS Electricity Duty Act, 1939)', 'FSA/FCA', 'Time-of-day adjustments'],
+} as const
+
+/** Fixed charge per kW of contracted load per month for LT-I. */
+export const LT1_FIXED_CHARGE_PER_KW_INR = 10
+
+/**
+ * Annual surplus settlement under net metering is at the TGERC-determined Average Pooled
+ * Power Purchase Cost (APPC). FY 2025-26 APPC: ₹5.330/kWh (TGERC order, Sept 2026).
+ */
+export const NET_METERING_SETTLEMENT_INR_PER_KWH = 5.33
+export const NET_METERING_SETTLEMENT_SOURCE = 'TGERC APPC for FY 2025-26 (₹5.330/kWh)'
+
+export type TariffCategory = 'domestic'
+
+type Slab = { upTo: number; rate: number }
+
+export type Lt1Subcategory = 'LT-I(A)' | 'LT-I(B)' | 'LT-I(C)'
+
+const LT1_LADDERS: { maxMonthlyUnits: number; sub: Lt1Subcategory; slabs: Slab[] }[] = [
+  {
+    maxMonthlyUnits: 100,
+    sub: 'LT-I(A)',
+    slabs: [
+      { upTo: 50, rate: 1.95 },
+      { upTo: 100, rate: 3.1 },
+    ],
+  },
+  {
+    maxMonthlyUnits: 200,
+    sub: 'LT-I(B)',
+    slabs: [
+      { upTo: 100, rate: 3.4 },
+      { upTo: 200, rate: 4.8 },
+    ],
+  },
+  {
+    maxMonthlyUnits: Infinity,
+    sub: 'LT-I(C)',
+    slabs: [
+      { upTo: 200, rate: 5.1 },
+      { upTo: 300, rate: 7.7 },
+      { upTo: 400, rate: 9.0 },
+      { upTo: 800, rate: 9.5 },
+      { upTo: Infinity, rate: 10.0 },
+    ],
+  },
+]
 
 export type SlabBreakdown = {
   slab: string
@@ -15,82 +74,59 @@ export type SlabBreakdown = {
 export type TariffCalculationResult = {
   monthlyUnitsKwh: number
   category: TariffCategory
+  subcategory: Lt1Subcategory
   slabs: SlabBreakdown[]
   energyChargesInr: number
   fixedChargesInr: number
-  electricityDutyInr: number
   estimatedTotalBillInr: number
-  effectiveRatePerUnit: number
+  /** Total (energy + fixed) per unit; null when there is no consumption. */
+  effectiveRatePerUnit: number | null
+  /** Rate the last unit is billed at — what each solar-offset unit saves. */
+  marginalRatePerUnit: number
+  source: typeof TARIFF_SOURCE
 }
 
-/**
- * Calculates domestic bill based on Telangana LT-1 telescopic slabs.
- */
+const round2 = (n: number) => Math.round(n * 100) / 100
+
 export function calculateTelanganaTariff(
   monthlyUnitsKwh: number,
-  category: TariffCategory = 'domestic'
+  options: { contractedLoadKw?: number } = {}
 ): TariffCalculationResult {
+  const units = Math.max(0, monthlyUnitsKwh)
+  const ladder = LT1_LADDERS.find((l) => units <= l.maxMonthlyUnits)!
+
   const slabs: SlabBreakdown[] = []
-  let remainingUnits = Math.max(0, monthlyUnitsKwh)
-  let energyCharges = 0
-
-  if (category === 'domestic') {
-    // Domestic LT-1 (Group B/C standard telescopic rates)
-    // 0-100 units @ ₹3.40
-    // 101-200 units @ ₹4.80
-    // 201-300 units @ ₹7.70
-    // 301-400 units @ ₹9.00
-    // 401-500 units @ ₹9.50
-    // >500 units @ ₹10.00
-    const slabDefs = [
-      { limit: 100, rate: 3.4 },
-      { limit: 100, rate: 4.8 },
-      { limit: 100, rate: 7.7 },
-      { limit: 100, rate: 9.0 },
-      { limit: 100, rate: 9.5 },
-      { limit: Infinity, rate: 10.0 },
-    ]
-
-    for (let i = 0; i < slabDefs.length; i++) {
-      if (remainingUnits <= 0) break
-      const currentLimit = slabDefs[i].limit
-      const unitsInSlab = Math.min(remainingUnits, currentLimit)
-      const cost = unitsInSlab * slabDefs[i].rate
-      energyCharges += cost
-      slabs.push({
-        slab: i === 0 ? '0-100 kWh' : i === 1 ? '101-200 kWh' : i === 2 ? '201-300 kWh' : i === 3 ? '301-400 kWh' : i === 4 ? '401-500 kWh' : '>500 kWh',
-        units: unitsInSlab,
-        ratePerUnit: slabDefs[i].rate,
-        totalInr: parseFloat(cost.toFixed(2)),
-      })
-      remainingUnits -= unitsInSlab
-    }
-  } else {
-    // Commercial LT-2 flat benchmark (~₹11.50/unit)
-    const cost = remainingUnits * 11.5
-    energyCharges = cost
+  let prev = 0
+  let energy = 0
+  let marginal = ladder.slabs[0].rate
+  for (const s of ladder.slabs) {
+    if (units <= prev) break
+    const inSlab = Math.min(units, s.upTo) - prev
+    const cost = inSlab * s.rate
+    energy += cost
+    marginal = s.rate
     slabs.push({
-      slab: 'All units (Commercial LT-2)',
-      units: remainingUnits,
-      ratePerUnit: 11.5,
-      totalInr: parseFloat(cost.toFixed(2)),
+      slab: `${prev + 1}-${s.upTo === Infinity ? '' : s.upTo} kWh`.replace(/-$/, '+'),
+      units: inSlab,
+      ratePerUnit: s.rate,
+      totalInr: round2(cost),
     })
+    prev = s.upTo
   }
 
-  const fixedCharges = category === 'domestic' ? 80 : 250
-  const electricityDuty = parseFloat((energyCharges * 0.06).toFixed(2)) // ~6% duty
-  const estimatedTotalBill = parseFloat((energyCharges + fixedCharges + electricityDuty).toFixed(2))
-  const effectiveRate =
-    monthlyUnitsKwh > 0 ? parseFloat((estimatedTotalBill / monthlyUnitsKwh).toFixed(2)) : 7.5
+  const fixed = LT1_FIXED_CHARGE_PER_KW_INR * Math.max(1, Math.ceil(options.contractedLoadKw ?? 1))
+  const total = round2(energy + fixed)
 
   return {
     monthlyUnitsKwh,
-    category,
+    category: 'domestic',
+    subcategory: ladder.sub,
     slabs,
-    energyChargesInr: parseFloat(energyCharges.toFixed(2)),
-    fixedChargesInr: fixedCharges,
-    electricityDutyInr: electricityDuty,
-    estimatedTotalBillInr: estimatedTotalBill,
-    effectiveRatePerUnit: effectiveRate,
+    energyChargesInr: round2(energy),
+    fixedChargesInr: fixed,
+    estimatedTotalBillInr: total,
+    effectiveRatePerUnit: units > 0 ? round2(total / units) : null,
+    marginalRatePerUnit: marginal,
+    source: TARIFF_SOURCE,
   }
 }

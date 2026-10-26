@@ -1,5 +1,6 @@
 import { z } from 'zod'
-import { calculatePMSuryaGharSubsidy } from '@/lib/calculations/financial'
+import { calculatePMSuryaGharSubsidy, PM_SURYA_GHAR } from '@/lib/calculations/financial'
+import { SOLAR_COST_PER_KW_INR } from '@/lib/calculations/systemSizing'
 
 export const CalculateSystemCostSchema = z.object({
   capacityKw: z.number().min(0.5).max(50).describe('System capacity in kW'),
@@ -11,8 +12,8 @@ export type CalculateSystemCostInput = z.infer<typeof CalculateSystemCostSchema>
 export async function calculateSystemCostTool(input: CalculateSystemCostInput) {
   const { capacityKw, batteryStorage } = input
 
-  // Benchmark capital costs in Telangana (₹/kW)
-  const baseCostPerKw = 62000
+  // Market estimate (not an official benchmark); battery cost is a rough indicative figure.
+  const baseCostPerKw = SOLAR_COST_PER_KW_INR
   const grossSolarCost = Math.round(capacityKw * baseCostPerKw)
   const batteryCost = batteryStorage ? Math.round(capacityKw * 35000) : 0
   const totalGrossCost = grossSolarCost + batteryCost
@@ -33,7 +34,9 @@ export async function calculateSystemCostTool(input: CalculateSystemCostInput) {
     subsidyDetails: {
       scheme: 'PM Surya Ghar: Muft Bijli Yojana (Central Financial Assistance)',
       eligibleSubsidyInr: subsidyAmount,
-      subsidyPerKwRate: capacityKw <= 2 ? '₹30,000 / kW' : '₹78,000 flat for ≥ 3 kW',
+      subsidyRule: '₹30,000/kW for the first 2 kW + ₹18,000 for the 3rd kW, capped at ₹78,000',
+      subsidySource: PM_SURYA_GHAR.source,
+      costIsEstimate: true,
     },
     netPayableCostInr: netConsumerCost,
   }

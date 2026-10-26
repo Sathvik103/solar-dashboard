@@ -145,16 +145,29 @@ export function calculatePaybackPeriod(
 }
 
 /**
- * Calculates PM Surya Ghar subsidy based on system capacity in kW.
- * Benchmark rates:
- * - Up to 2 kW: ₹30,000 per kW (₹60,000 max)
- * - 3 kW or higher: ₹78,000 maximum for residential consumers
+ * PM Surya Ghar: Muft Bijli Yojana central financial assistance for residential rooftop solar
+ * (MNRE guidelines, as amended July 2025; general-category states incl. Telangana):
+ * - ₹30,000 per kW for the first 2 kW
+ * - ₹18,000 per kW for the next 1 kW
+ * - capped at ₹78,000 (no additional CFA beyond 3 kW)
+ * Pro-rated for fractional capacities. Verify on pmsuryaghar.gov.in before quoting.
  */
+export const PM_SURYA_GHAR = {
+  firstTierPerKwInr: 30000,
+  firstTierMaxKw: 2,
+  secondTierPerKwInr: 18000,
+  secondTierMaxKw: 3,
+  capInr: 78000,
+  source: 'MNRE PM Surya Ghar guidelines (amended July 2025)',
+} as const
+
 export function calculatePMSuryaGharSubsidy(capacityKw: number): number {
-  if (capacityKw <= 0) return 0
-  if (capacityKw <= 1) return 30000
-  if (capacityKw <= 2) return 60000
-  return 78000 // capped at ₹78,000 for >= 3 kW
+  if (!(capacityKw > 0)) return 0
+  const s = PM_SURYA_GHAR
+  const tier1 = Math.min(capacityKw, s.firstTierMaxKw) * s.firstTierPerKwInr
+  const tier2 =
+    Math.max(0, Math.min(capacityKw, s.secondTierMaxKw) - s.firstTierMaxKw) * s.secondTierPerKwInr
+  return Math.min(s.capInr, Math.round(tier1 + tier2))
 }
 
 /**

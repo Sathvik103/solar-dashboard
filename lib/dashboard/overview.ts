@@ -78,7 +78,8 @@ function pickTariff(
   const avgUnits = stats.averageMonthlyConsumption
   const avgBill = stats.averageMonthlyBill
   if (avgUnits && avgBill) return { rate: Number((avgBill / avgUnits).toFixed(2)), source: 'bill-history' }
-  if (monthlyUnits) return { rate: calculateTelanganaTariff(monthlyUnits).effectiveRatePerUnit, source: 'slab-model' }
+  // Solar offsets the most expensive units first, so the marginal slab rate is the right saving per kWh.
+  if (monthlyUnits) return { rate: calculateTelanganaTariff(monthlyUnits).marginalRatePerUnit, source: 'slab-model' }
   return { rate: null, source: null }
 }
 

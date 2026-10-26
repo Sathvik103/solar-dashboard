@@ -6,7 +6,7 @@ import {
   addConversationMessage,
 } from '@/lib/dal/conversations'
 import { z } from 'zod'
-import { rateLimit } from '@/lib/rate-limit'
+import { checkRateLimit } from '@/lib/rate-limit'
 
 const ChatRequestSchema = z.object({
   message: z.string().trim().min(1, 'Message cannot be empty').max(2000, 'Message is too long (max 2000 characters)'),
@@ -19,7 +19,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Sign in to use the Solar Agent' }, { status: 401 })
   }
 
-  const limit = rateLimit(`chat:${user.id}`, 20, 60_000)
+  const limit = await checkRateLimit(`chat:${user.id}`, 20, 60_000)
   if (!limit.allowed) {
     return NextResponse.json(
       { error: 'Too many requests. Please wait a moment.' },

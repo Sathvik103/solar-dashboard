@@ -58,6 +58,7 @@ export default function SolarAnalysisStudio({ initialProfile }: { initialProfile
     toStudioShading(initialProfile?.shadingLevel)
   )
   const [orientation] = useState<'south' | 'east' | 'west'>('south')
+  const usingExampleInputs = initialProfile?.monthlyUnitsKwh == null
   const [climate, setClimate] = useState<{ place: string; monthly: MonthlyClimateInput[] } | null>(null)
 
   // Prefer measured local climatology; the offline reference table is used only if this fails.
@@ -120,6 +121,13 @@ export default function SolarAnalysisStudio({ initialProfile }: { initialProfile
               <CardDescription>
                 What-if simulator combining deterministic sizing, Telangana tariffs, PM Surya Ghar subsidies and a physics-based yield estimate. Inputs start from your profile; edit them to explore scenarios.
               </CardDescription>
+              {usingExampleInputs && (
+                <p role="note" className="text-xs text-amber-600 font-medium">
+                  Showing example inputs (350 kWh/month, ₹2,800 bill, 800 sq ft) because your profile has no
+                  consumption yet. <Link href="/profile" className="underline">Add your details</Link> for a personal
+                  proposal.
+                </p>
+              )}
             </div>
             <Badge className="bg-emerald-600 font-mono text-xs">
               {climate ? `Measured climate: ${climate.place}` : 'Reference climate (offline)'}
