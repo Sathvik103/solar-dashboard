@@ -22,6 +22,7 @@ export const TARIFF_SOURCE = {
 export const LT1_FIXED_CHARGE_PER_KW_INR = 10
 
 /**
+ * Contracted load is the sanctioned connection load on the bill, not the rooftop solar capacity.
  * Annual surplus settlement under net metering is at the TGERC-determined Average Pooled
  * Power Purchase Cost (APPC). FY 2025-26 APPC: ₹5.330/kWh (TGERC order, Sept 2026).
  */
