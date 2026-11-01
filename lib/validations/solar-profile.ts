@@ -30,6 +30,13 @@ export const SolarProfileSchema = z.object({
     .nullable()
     .optional(),
 
+  sanctionedLoadKw: z.coerce
+    .number({ message: 'Must be a number' })
+    .positive('Sanctioned load must be greater than 0')
+    .max(150, 'LT connections cannot exceed 150 kW')
+    .nullable()
+    .optional(),
+
   roofAreaSqft: z.coerce
     .number({ message: 'Must be a number' })
     .positive('Roof area must be greater than 0')

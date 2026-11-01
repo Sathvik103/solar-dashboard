@@ -70,6 +70,8 @@ export type SolarProfile = {
    * knowledge base (Phase 3+) and supersede this field.
    */
   electricityTariffInr: number | null
+  /** Sanctioned (contracted) connection load from the bill, kW. */
+  sanctionedLoadKw: number | null
 
   // Roof details
   roofAreaSqft: number | null

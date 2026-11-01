@@ -2,6 +2,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import OutputChart from '@/components/charts/OutputChart'
+import GridExchangeCard from '@/components/GridExchangeCard'
+import { NET_METERING_SETTLEMENT_SOURCE, TARIFF_SOURCE } from '@/lib/calculations/tariffs'
 import { AnimatedCard, AnimatedContainer } from '@/components/AnimatedCard'
 import PageWrapper from '@/components/layout/PageWrapper'
 import { requireUser } from '@/lib/dal/users'
@@ -201,6 +203,8 @@ export default async function DashboardPage() {
         </div>
 
         <div className="space-y-4">
+          <GridExchangeCard grid={overview.grid} billEstimate={overview.billEstimate} loadCheck={overview.loadCheck} />
+
           {/* Quick Knowledge Highlights */}
           <Card>
             <CardHeader className="pb-3">
@@ -211,16 +215,17 @@ export default async function DashboardPage() {
             </CardHeader>
             <CardContent className="space-y-3 text-xs">
               <div className="p-2.5 rounded-lg bg-muted/40 space-y-1">
-                <span className="font-semibold text-foreground">TGERC Net-Metering:</span>
+                <span className="font-semibold text-foreground">Tariff in use:</span>
                 <p className="text-muted-foreground">
-                  Allowed up to 100% of sanctioned load, capped at 1000 kW per consumer connection.
+                  {TARIFF_SOURCE.schedule}. Electricity duty, FSA and ToD adjustments are billed extra.
                 </p>
               </div>
 
               <div className="p-2.5 rounded-lg bg-muted/40 space-y-1">
                 <span className="font-semibold text-foreground">Annual Settlement:</span>
                 <p className="text-muted-foreground">
-                  Unused energy credits are settled every financial year on March 31st at the average pooled power cost.
+                  Surplus left on 31 March is paid at the average pooled power purchase cost:{' '}
+                  {NET_METERING_SETTLEMENT_SOURCE}.
                 </p>
               </div>
 

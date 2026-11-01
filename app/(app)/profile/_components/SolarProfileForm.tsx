@@ -254,6 +254,23 @@ export default function SolarProfileForm({ existingProfile }: Props) {
           </div>
 
           <div className="flex flex-col gap-1.5">
+            <Label htmlFor="sanctionedLoadKw">Sanctioned Load (kW, from your bill)</Label>
+            <Input
+              id="sanctionedLoadKw"
+              name="sanctionedLoadKw"
+              type="number"
+              step="0.5"
+              min="0"
+              placeholder="e.g. 3"
+              defaultValue={existingProfile?.sanctionedLoadKw ?? ''}
+              disabled={isPending}
+            />
+            {state?.errors?.sanctionedLoadKw && (
+              <p className="text-xs text-destructive">{state.errors.sanctionedLoadKw[0]}</p>
+            )}
+          </div>
+
+          <div className="flex flex-col gap-1.5">
             <Label htmlFor="preferredCapacityKw">Preferred Capacity (kW)</Label>
             <Input
               id="preferredCapacityKw"

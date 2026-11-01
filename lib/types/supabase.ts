@@ -62,6 +62,7 @@ export interface Database {
           shading_level: string | null
           budget_inr: number | null
           preferred_capacity_kw: number | null
+          sanctioned_load_kw: number | null
           battery_preference: string
           created_at: string
           updated_at: string
@@ -82,6 +83,7 @@ export interface Database {
           shading_level?: string | null
           budget_inr?: number | null
           preferred_capacity_kw?: number | null
+          sanctioned_load_kw?: number | null
           battery_preference?: string
           created_at?: string
           updated_at?: string
@@ -102,6 +104,7 @@ export interface Database {
           shading_level?: string | null
           budget_inr?: number | null
           preferred_capacity_kw?: number | null
+          sanctioned_load_kw?: number | null
           battery_preference?: string
           created_at?: string
           updated_at?: string

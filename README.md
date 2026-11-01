@@ -28,7 +28,7 @@ npm install
 npm run dev
 ```
 
-Apply `supabase/migrations/*.sql` in order (001–008). Run `npm run ingest:knowledge` once to load the knowledge base.
+Apply `supabase/migrations/*.sql` in order (001–009). Run `npm run ingest:knowledge` once to load the knowledge base.
 
 ## Scripts
 

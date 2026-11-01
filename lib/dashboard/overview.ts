@@ -17,6 +17,7 @@ import {
 import { estimateHourlyPower, shadingFactorFor, sumEnergyKwh, type PvSystem } from '@/lib/solar/pvModel'
 import { calculateOptimalSystemSize } from '@/lib/calculations/systemSizing'
 import { calculateTelanganaTariff } from '@/lib/calculations/tariffs'
+import { summariseGrid, type GridSummary } from './grid'
 import type { SolarProfile } from '@/lib/types/user'
 
 export type HourlyPoint = { hour: string; output: number }
@@ -50,7 +51,16 @@ export type DashboardOverview = {
   sizing: ReturnType<typeof calculateOptimalSystemSize> | null
   hasConsumptionData: boolean
   daily: DailyPoint[]
-  grid: { exportedKwh: number; importedKwh: number; days: number } | null
+  grid: GridSummary | null
+  /** Current LT-I bill estimate from average units, using the sanctioned load for the fixed charge. */
+  billEstimate: {
+    monthlyUnits: number
+    totalInr: number
+    subcategory: string
+    fixedChargeBasis: 'sanctioned-load' | 'minimum-1kw'
+  } | null
+  /** Set when the solar size under consideration exceeds the sanctioned connection load. */
+  loadCheck: { sanctionedLoadKw: number; capacityKw: number; exceeds: boolean } | null
 }
 
 const IST_OFFSET_MS = 5.5 * 3600 * 1000
@@ -131,13 +141,28 @@ export async function buildDashboardOverview(userId: string): Promise<DashboardO
     sizing,
     hasConsumptionData: history.length > 0,
     daily: [],
-    grid: generation.length
-      ? {
-          exportedKwh: round(generation.reduce((a, g) => a + g.exportedKwh, 0)),
-          importedKwh: round(generation.reduce((a, g) => a + g.gridImportKwh, 0)),
-          days: generation.length,
-        }
+    grid: summariseGrid(generation),
+    billEstimate: monthlyUnits
+      ? (() => {
+          const bill = calculateTelanganaTariff(monthlyUnits, {
+            contractedLoadKw: profile?.sanctionedLoadKw ?? undefined,
+          })
+          return {
+            monthlyUnits,
+            totalInr: bill.estimatedTotalBillInr,
+            subcategory: bill.subcategory,
+            fixedChargeBasis: profile?.sanctionedLoadKw ? ('sanctioned-load' as const) : ('minimum-1kw' as const),
+          }
+        })()
       : null,
+    loadCheck:
+      profile?.sanctionedLoadKw && basis
+        ? {
+            sanctionedLoadKw: profile.sanctionedLoadKw,
+            capacityKw: basis.capacityKw,
+            exceeds: basis.capacityKw > profile.sanctionedLoadKw,
+          }
+        : null,
   }
 
   if (!basis) {

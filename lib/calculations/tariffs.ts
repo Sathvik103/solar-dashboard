@@ -18,11 +18,13 @@ export const TARIFF_SOURCE = {
   excludes: ['Electricity duty (TS Electricity Duty Act, 1939)', 'FSA/FCA', 'Time-of-day adjustments'],
 } as const
 
-/** Fixed charge per kW of contracted load per month for LT-I. */
+/**
+ * Fixed charge per kW of contracted load per month for LT-I.
+ * Contracted load is the sanctioned connection load on the bill, not the rooftop solar capacity.
+ */
 export const LT1_FIXED_CHARGE_PER_KW_INR = 10
 
 /**
- * Contracted load is the sanctioned connection load on the bill, not the rooftop solar capacity.
  * Annual surplus settlement under net metering is at the TGERC-determined Average Pooled
  * Power Purchase Cost (APPC). FY 2025-26 APPC: ₹5.330/kWh (TGERC order, Sept 2026).
  */
