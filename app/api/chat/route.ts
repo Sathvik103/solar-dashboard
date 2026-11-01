@@ -1,12 +1,10 @@
 import { NextResponse } from 'next/server'
+import { z } from 'zod'
 import { getCurrentUser } from '@/lib/dal/users'
 import { runSolarAgent } from '@/lib/agent/orchestrator'
-import {
-  createConversation,
-  addConversationMessage,
-} from '@/lib/dal/conversations'
-import { z } from 'zod'
-import { checkRateLimit } from '@/lib/rate-limit'
+import { createConversation, addConversationMessage, getRecentHistory } from '@/lib/dal/conversations'
+import { enforce, rateLimitHeaders, tooManyRequests } from '@/lib/rate-limit'
+import { readJson } from '@/lib/http'
 
 const ChatRequestSchema = z.object({
   message: z.string().trim().min(1, 'Message cannot be empty').max(2000, 'Message is too long (max 2000 characters)'),
@@ -15,77 +13,51 @@ const ChatRequestSchema = z.object({
 
 export async function POST(request: Request) {
   const user = await getCurrentUser()
-  if (!user) {
-    return NextResponse.json({ error: 'Sign in to use the Solar Agent' }, { status: 401 })
-  }
+  if (!user) return NextResponse.json({ error: 'Sign in to use the assistant' }, { status: 401 })
 
-  const limit = await checkRateLimit(`chat:${user.id}`, 20, 60_000)
-  if (!limit.allowed) {
+  const limit = await enforce('chat', user.id)
+  if (!limit.allowed) return tooManyRequests(limit, 'You are sending messages too quickly. Please wait a moment.')
+  const headers = rateLimitHeaders(limit)
+
+  const body = await readJson(request, ChatRequestSchema, 8 * 1024, headers)
+  if (!body.ok) return body.response
+  const { message, conversationId: existing } = body.data
+
+  try {
+    // Every conversation and message is stored, so history survives reloads and devices.
+    const conversationId =
+      existing ?? (await createConversation(message.slice(0, 60) + (message.length > 60 ? '…' : ''))).id
+    const history = existing ? await getRecentHistory(existing, 6) : []
+    await addConversationMessage(conversationId, 'user', message)
+
+    const result = await runSolarAgent(message, { userId: user.id, conversationId, history })
+
+    await addConversationMessage(conversationId, 'assistant', result.answer, {
+      citations: result.citations,
+      toolCalls: result.toolsUsed,
+      traceEvents: result.traceEvents,
+      artifacts: result.artifacts,
+      suggestions: result.suggestions,
+    })
+
     return NextResponse.json(
-      { error: 'Too many requests. Please wait a moment.' },
-      { status: 429, headers: { 'Retry-After': String(limit.retryAfterSeconds) } }
+      {
+        conversationId,
+        answer: result.answer,
+        citations: result.citations,
+        traceEvents: result.traceEvents,
+        toolsUsed: result.toolsUsed,
+        artifacts: result.artifacts,
+        suggestions: result.suggestions,
+        source: result.source,
+        intent: result.intent,
+        verificationStatus: result.verificationStatus,
+        durationMs: result.durationMs,
+      },
+      { headers }
     )
-  }
-
-  let body: unknown
-  try {
-    body = await request.json()
-  } catch {
-    return NextResponse.json({ error: 'Invalid JSON payload' }, { status: 400 })
-  }
-
-  const parse = ChatRequestSchema.safeParse(body)
-  if (!parse.success) {
-    return NextResponse.json({ error: 'Validation failed', details: parse.error.format() }, { status: 400 })
-  }
-
-  const { message, conversationId: existingConvId } = parse.data
-
-  try {
-    let activeConversationId = existingConvId
-
-    // If user is authenticated and no conversation ID given, create one
-    if (!activeConversationId) {
-      const summaryTitle = message.slice(0, 35) + (message.length > 35 ? '...' : '')
-      const newConv = await createConversation(summaryTitle)
-      activeConversationId = newConv.id
-    }
-
-    // Record user message if authenticated
-    if (activeConversationId) {
-      await addConversationMessage(activeConversationId, 'user', message)
-    }
-
-    // Run Solar Agent Orchestrator
-    const agentResult = await runSolarAgent(message, {
-      userId: user.id,
-      conversationId: activeConversationId,
-    })
-
-    // Record assistant response if authenticated
-    if (activeConversationId) {
-      await addConversationMessage(activeConversationId, 'assistant', agentResult.answer, {
-        citations: agentResult.citations,
-        toolCalls: agentResult.toolsUsed,
-        traceEvents: agentResult.traceEvents,
-      })
-    }
-
-    return NextResponse.json({
-      conversationId: activeConversationId || null,
-      answer: agentResult.answer,
-      citations: agentResult.citations,
-      traceEvents: agentResult.traceEvents,
-      toolsUsed: agentResult.toolsUsed,
-      intent: agentResult.intent,
-      verificationStatus: agentResult.verificationStatus,
-      durationMs: agentResult.durationMs,
-    })
   } catch (error) {
     console.error('[api/chat] agent failure', error)
-    return NextResponse.json(
-      { error: 'The Solar Agent hit an unexpected error. Please try again.' },
-      { status: 500 }
-    )
+    return NextResponse.json({ error: 'The assistant hit an unexpected error. Please try again.' }, { status: 500, headers })
   }
 }

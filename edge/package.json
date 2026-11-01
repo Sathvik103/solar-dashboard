@@ -1,0 +1,24 @@
+{
+  "name": "solarintel-edge-agent",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Reads an inverter or meter (Modbus TCP / SunSpec, MQTT, or a simulator) and uploads interval samples to SolarIntel.",
+  "type": "module",
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "agent": "tsx --env-file=agent.env src/agent.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "node --import tsx --test src/*.test.ts"
+  },
+  "dependencies": {
+    "mqtt": "5.10.4"
+  },
+  "optionalDependencies": {
+    "modbus-serial": "8.0.17"
+  },
+  "devDependencies": {
+    "@types/node": "20.17.10",
+    "tsx": "4.19.2",
+    "typescript": "5.7.2"
+  }
+}

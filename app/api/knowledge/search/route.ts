@@ -2,47 +2,29 @@ import { NextResponse } from 'next/server'
 import { requireUser } from '@/lib/dal/users'
 import { KnowledgeSearchSchema } from '@/lib/validations/knowledge'
 import { searchKnowledgeBase } from '@/lib/rag/retrieval'
-import { errorMessage } from '@/lib/utils'
+import { enforce, rateLimitHeaders, tooManyRequests } from '@/lib/rate-limit'
+import { readJson } from '@/lib/http'
 
 export async function POST(request: Request) {
+  let user
   try {
-    await requireUser()
+    user = await requireUser()
   } catch {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
+  const limit = await enforce('knowledgeSearch', user.id)
+  if (!limit.allowed) return tooManyRequests(limit)
+  const headers = rateLimitHeaders(limit)
 
-  let body
-  try {
-    body = await request.json()
-  } catch {
-    return NextResponse.json({ error: 'Invalid JSON payload' }, { status: 400 })
-  }
-
-  const parseResult = KnowledgeSearchSchema.safeParse(body)
-  if (!parseResult.success) {
-    return NextResponse.json(
-      { error: 'Validation failed', details: parseResult.error.flatten().fieldErrors },
-      { status: 400 }
-    )
-  }
+  const body = await readJson(request, KnowledgeSearchSchema, 16 * 1024, headers)
+  if (!body.ok) return body.response
 
   try {
-    const { query, topK, similarityThreshold, locationScope, documentType, organization } =
-      parseResult.data
-
-    const results = await searchKnowledgeBase(query, {
-      topK,
-      similarityThreshold,
-      locationScope,
-      documentType,
-      organization,
-    })
-
-    return NextResponse.json({ results })
+    const { query, topK, similarityThreshold, locationScope, documentType, organization } = body.data
+    const results = await searchKnowledgeBase(query, { topK, similarityThreshold, locationScope, documentType, organization })
+    return NextResponse.json({ results }, { headers })
   } catch (error) {
-    return NextResponse.json(
-      { error: errorMessage(error) || 'Knowledge base retrieval failed' },
-      { status: 500 }
-    )
+    console.error('[api/knowledge/search] failed', error)
+    return NextResponse.json({ error: 'Knowledge base retrieval failed' }, { status: 500, headers })
   }
 }

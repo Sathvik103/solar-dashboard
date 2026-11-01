@@ -39,3 +39,8 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# edge agent
+/edge/node_modules
+/edge/agent.env
+/edge/data

@@ -19,6 +19,7 @@ import { calculateOptimalSystemSize } from '@/lib/calculations/systemSizing'
 import { calculateTelanganaTariff } from '@/lib/calculations/tariffs'
 import { summariseGrid, type GridSummary } from './grid'
 import { fitCalibration, type Calibration } from '@/lib/solar/calibration'
+import { listDevices } from '@/lib/dal/devices'
 import type { SolarProfile } from '@/lib/types/user'
 
 export type HourlyPoint = { hour: string; output: number }
@@ -55,6 +56,8 @@ export type DashboardOverview = {
   grid: GridSummary | null
   /** Fit of the weather model to the user's logged days (null until enough days are logged). */
   calibration: Calibration | null
+  /** Measured output from online inverters, when any are reporting. */
+  live: { powerKw: number; devices: number; lastSeenAt: string; simulated: boolean } | null
   monthToDate: { loggedKwh: number; savedInr: number | null; days: number } | null
   /** Current LT-I bill estimate from average units, using the sanctioned load for the fixed charge. */
   billEstimate: {
@@ -101,11 +104,12 @@ function pickTariff(
 }
 
 export async function buildDashboardOverview(userId: string): Promise<DashboardOverview> {
-  const [profile, history, generation, system] = await Promise.all([
+  const [profile, history, generation, system, devices] = await Promise.all([
     getSolarProfile(userId),
     getUserConsumptionHistory(userId),
     getGenerationHistory(CALIBRATION_WINDOW_DAYS, userId),
     getActiveSolarSystem(userId),
+    listDevices(userId).catch(() => []),
   ])
 
   const stats = computeEnergyStatistics(history)
@@ -154,6 +158,7 @@ export async function buildDashboardOverview(userId: string): Promise<DashboardO
     daily: [],
     grid: summariseGrid(recentGeneration),
     calibration: null,
+    live: summariseLive(devices),
     monthToDate: thisMonth.length
       ? {
           loggedKwh: round(thisMonth.reduce((a, g) => a + g.generationKwh, 0)),
@@ -254,6 +259,19 @@ export async function buildDashboardOverview(userId: string): Promise<DashboardO
   }
 
   return base
+}
+
+function summariseLive(devices: Awaited<ReturnType<typeof listDevices>>): DashboardOverview['live'] {
+  const reporting = devices.filter(
+    (d) => (d.kind === 'inverter' || d.kind === 'data_logger') && d.status === 'online' && d.lastPowerW != null
+  )
+  if (!reporting.length) return null
+  return {
+    powerKw: Math.round(reporting.reduce((a, d) => a + Math.max(0, d.lastPowerW ?? 0), 0)) / 1000,
+    devices: reporting.length,
+    lastSeenAt: reporting.map((d) => d.lastSeenAt!).sort().at(-1)!,
+    simulated: reporting.some((d) => d.protocol === 'simulator'),
+  }
 }
 
 export function dailyFromLogs(

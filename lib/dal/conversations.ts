@@ -21,6 +21,8 @@ export type MessageRecord = {
   citations: unknown[]
   toolCalls: unknown[]
   traceEvents: unknown[]
+  artifacts: unknown[]
+  suggestions: string[]
   createdAt: string
 }
 
@@ -102,8 +104,30 @@ export async function getConversationMessages(conversationId: string): Promise<M
     citations: (m.citations as unknown[] | null) || [],
     toolCalls: (m.tool_calls as unknown[] | null) || [],
     traceEvents: (m.trace_events as unknown[] | null) || [],
+    artifacts: (m.artifacts as unknown[] | null) || [],
+    suggestions: (m.suggestions as string[] | null) || [],
     createdAt: m.created_at,
   }))
+}
+
+/** The last `limit` user/assistant messages of a conversation, oldest first (model memory). */
+export async function getRecentHistory(
+  conversationId: string,
+  limit = 6
+): Promise<{ role: 'user' | 'assistant'; content: string }[]> {
+  const user = await requireUser()
+  const supabase = await createSupabaseServerClient()
+  const { data } = await supabase
+    .from('messages')
+    .select('role, content')
+    .eq('conversation_id', conversationId)
+    .eq('user_id', user.id)
+    .in('role', ['user', 'assistant'])
+    .order('created_at', { ascending: false })
+    .limit(limit)
+  return (data ?? [])
+    .reverse()
+    .map((m) => ({ role: m.role as 'user' | 'assistant', content: m.content }))
 }
 
 /**
@@ -113,7 +137,7 @@ export async function addConversationMessage(
   conversationId: string,
   role: 'user' | 'assistant' | 'system' | 'tool',
   content: string,
-  extra: { citations?: unknown[]; toolCalls?: unknown[]; traceEvents?: unknown[] } = {}
+  extra: { citations?: unknown[]; toolCalls?: unknown[]; traceEvents?: unknown[]; artifacts?: unknown[]; suggestions?: string[] } = {}
 ): Promise<void> {
   const user = await requireUser()
   const supabase = await createSupabaseServerClient()
@@ -126,6 +150,8 @@ export async function addConversationMessage(
     citations: (extra.citations || []) as Json,
     tool_calls: (extra.toolCalls || []) as Json,
     trace_events: (extra.traceEvents || []) as Json,
+    artifacts: (extra.artifacts || []) as Json,
+    suggestions: (extra.suggestions || []) as Json,
   })
 
   // Update conversation updated_at

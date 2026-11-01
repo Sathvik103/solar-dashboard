@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { checkRateLimit, rateLimit, resetRateLimits } from './rate-limit'
+import { checkRateLimit, rateLimit, resetRateLimits } from './core'
 
 describe('rateLimit (in-memory)', () => {
   beforeEach(resetRateLimits)
@@ -11,6 +11,13 @@ describe('rateLimit (in-memory)', () => {
     expect(blocked.allowed).toBe(false)
     expect(blocked.retryAfterSeconds).toBe(1)
     expect(rateLimit('u', 2, 1000, 1500).allowed).toBe(true)
+  })
+
+  it('reports remaining requests', () => {
+    expect(rateLimit('r', 3, 1000, 0).remaining).toBe(2)
+    expect(rateLimit('r', 3, 1000, 1).remaining).toBe(1)
+    expect(rateLimit('r', 3, 1000, 2).remaining).toBe(0)
+    expect(rateLimit('r', 3, 1000, 3)).toMatchObject({ allowed: false, remaining: 0 })
   })
 
   it('tracks keys independently', () => {

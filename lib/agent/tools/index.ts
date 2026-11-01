@@ -11,6 +11,7 @@ import { createSolarPlanTool, CreateSolarPlanSchema } from './createSolarPlan'
 import { getConsumptionHistoryTool, GetConsumptionHistorySchema } from './getConsumptionHistory'
 import { getRegionalStatisticsTool, GetRegionalStatisticsSchema } from './getRegionalStatistics'
 import { getMLPredictionsTool, GetMLPredictionsSchema } from './getMLPredictions'
+import { getEnergySummaryTool, GetEnergySummarySchema } from './getEnergySummary'
 
 export type AgentToolDefinition = {
   name: string
@@ -91,6 +92,12 @@ export const AGENT_TOOLS: Record<string, AgentToolDefinition> = {
     description: 'Measured monthly solar irradiance and temperature (ERA5) for a Telangana district, plus curated regional statistics when available.',
     schema: GetRegionalStatisticsSchema,
     execute: getRegionalStatisticsTool,
+  },
+  getEnergySummary: {
+    name: 'getEnergySummary',
+    description: "The signed-in user's recorded generation, grid exchange, bills and device status for the last 30 days.",
+    schema: GetEnergySummarySchema,
+    execute: getEnergySummaryTool,
   },
   getMLPredictions: {
     name: 'getMLPredictions',

@@ -68,7 +68,7 @@ export function StatGrid({ children, className }: { children: React.ReactNode; c
   return (
     <div
       className={cn(
-        'grid grid-cols-1 gap-px overflow-hidden rounded-lg border bg-border sm:grid-cols-2 xl:grid-cols-4',
+        'stagger grid grid-cols-1 gap-px overflow-hidden rounded-lg border bg-border sm:grid-cols-2 xl:grid-cols-4',
         className
       )}
     >

@@ -4,6 +4,7 @@ import {
   Area,
   AreaChart,
   Bar,
+  BarChart,
   CartesianGrid,
   ComposedChart,
   Line,
@@ -54,7 +55,7 @@ export function TodayOutputChart({ data, height = 240 }: { data: { hour: string;
             strokeWidth={1.75}
             fill="var(--chart-1)"
             fillOpacity={0.12}
-            isAnimationActive={false}
+            animationDuration={700}
           />
         </AreaChart>
       </ResponsiveContainer>
@@ -78,7 +79,7 @@ export function DailyEnergyChart({
           <XAxis dataKey="label" tick={AXIS} tickLine={false} axisLine={false} interval="preserveStartEnd" minTickGap={16} />
           <YAxis tick={AXIS} tickLine={false} axisLine={false} width={44} unit=" kWh" />
           <Tooltip cursor={{ fill: 'var(--muted)' }} content={(p) => <ChartTooltip {...p} unit="kWh" />} />
-          <Bar dataKey="loggedKwh" name="Logged" fill="var(--chart-2)" radius={[2, 2, 0, 0]} maxBarSize={14} isAnimationActive={false} />
+          <Bar dataKey="loggedKwh" name="Logged" fill="var(--chart-2)" radius={[2, 2, 0, 0]} maxBarSize={14} animationDuration={700} />
           <Line
             type="monotone"
             dataKey="modelledKwh"
@@ -87,9 +88,35 @@ export function DailyEnergyChart({
             strokeWidth={1.75}
             dot={false}
             connectNulls
-            isAnimationActive={false}
+            animationDuration={700}
           />
         </ComposedChart>
+      </ResponsiveContainer>
+    </div>
+  )
+}
+
+/** Simple vertical bars for a short daily series; null values render as gaps. */
+export function DailyBars({
+  data,
+  unit,
+  height = 200,
+}: {
+  data: { date: string; value: number | null }[]
+  unit: string
+  height?: number
+}) {
+  const rows = data.map((d) => ({ ...d, label: d.date.slice(5).replace('-', '/') }))
+  return (
+    <div style={{ height }}>
+      <ResponsiveContainer width="100%" height="100%">
+        <BarChart data={rows} margin={{ top: 8, right: 8, bottom: 0, left: -12 }}>
+          <CartesianGrid vertical={false} stroke="var(--border)" />
+          <XAxis dataKey="label" tick={AXIS} tickLine={false} axisLine={false} />
+          <YAxis tick={AXIS} tickLine={false} axisLine={false} width={44} unit={` ${unit}`} />
+          <Tooltip cursor={{ fill: 'var(--muted)' }} content={(p) => <ChartTooltip {...p} unit={unit} />} />
+          <Bar dataKey="value" name="Energy" fill="var(--chart-1)" radius={[2, 2, 0, 0]} maxBarSize={36} animationDuration={600} />
+        </BarChart>
       </ResponsiveContainer>
     </div>
   )

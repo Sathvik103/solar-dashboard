@@ -2,7 +2,16 @@
 
 import { redirect } from 'next/navigation'
 import { z } from 'zod'
+import { headers } from 'next/headers'
 import { createSupabaseServerClient } from '@/lib/db/client'
+import { clientIp, enforce } from '@/lib/rate-limit'
+
+async function authThrottled(): Promise<AuthActionState | null> {
+  const r = await enforce('auth', clientIp(await headers()))
+  return r.allowed
+    ? null
+    : { errors: { general: [`Too many attempts. Try again in ${Math.ceil(r.retryAfterSeconds / 60)} minute(s).`] } }
+}
 
 export type AuthActionState = {
   errors?: {
@@ -29,6 +38,8 @@ export async function signUpAction(
   prevState: AuthActionState | undefined,
   formData: FormData
 ): Promise<AuthActionState> {
+  const throttled = await authThrottled()
+  if (throttled) return throttled
   const rawData = {
     fullName: formData.get('full_name') as string,
     email: formData.get('email') as string,
@@ -78,6 +89,8 @@ export async function logInAction(
   prevState: AuthActionState | undefined,
   formData: FormData
 ): Promise<AuthActionState> {
+  const throttled = await authThrottled()
+  if (throttled) return throttled
   const rawData = {
     email: formData.get('email') as string,
     password: formData.get('password') as string,

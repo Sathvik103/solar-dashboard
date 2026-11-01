@@ -5,6 +5,7 @@ import { ArrowUp, ChevronDown, ExternalLink, History, Plus, Trash2, X } from 'lu
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import Markdown from './Markdown'
+import ArtifactView from './ArtifactView'
 import { useAssistant, type AssistantMessage } from './AssistantProvider'
 
 const STARTERS = [
@@ -79,6 +80,35 @@ function Working({ message }: { message: AssistantMessage }) {
         </ul>
       )}
     </div>
+  )
+}
+
+const SOURCE_NOTE: Record<string, string> = {
+  deterministic: 'Calculated directly',
+  cache: 'Same as a recent answer',
+  budget: 'Daily limit reached',
+  fallback: 'Figures only',
+}
+
+/** Rotating status while the assistant works, so a 2-5 s wait does not feel frozen. */
+function Thinking() {
+  const steps = ['Reading your profile and readings', 'Running the calculators', 'Checking the regulations', 'Writing the answer']
+  const [i, setI] = useState(0)
+  useEffect(() => {
+    const id = setInterval(() => setI((n) => Math.min(n + 1, steps.length - 1)), 1100)
+    return () => clearInterval(id)
+  }, [steps.length])
+  return (
+    <li className="flex items-center gap-2.5 text-[13px] text-muted-foreground" aria-live="polite">
+      <span className="flex gap-1">
+        <span className="size-1.5 animate-pulse rounded-full bg-primary" />
+        <span className="size-1.5 animate-pulse rounded-full bg-primary [animation-delay:150ms]" />
+        <span className="size-1.5 animate-pulse rounded-full bg-primary [animation-delay:300ms]" />
+      </span>
+      <span key={i} className="animate-in-up">
+        {steps[i]}
+      </span>
+    </li>
   )
 }
 
@@ -243,29 +273,46 @@ export default function AssistantDrawer() {
               <ol className="space-y-5">
                 {messages.map((m) =>
                   m.role === 'user' ? (
-                    <li key={m.id} className="flex justify-end">
+                    <li key={m.id} className="animate-in-up flex justify-end">
                       <div className="max-w-[85%] rounded-md bg-secondary px-3 py-2 text-[13.5px] leading-6 whitespace-pre-wrap">
                         {m.content}
                       </div>
                     </li>
                   ) : (
-                    <li key={m.id} className={cn(m.failed && 'text-destructive')}>
+                    <li key={m.id} className={cn('animate-in-up', m.failed && 'text-destructive')}>
                       {m.failed ? <p className="text-[13px]">{m.content}</p> : <Markdown>{m.content}</Markdown>}
+                      {!!m.artifacts?.length && (
+                        <div className="mt-3 space-y-3">
+                          {m.artifacts.map((a) => (
+                            <ArtifactView key={a.id} artifact={a} />
+                          ))}
+                        </div>
+                      )}
                       <Sources message={m} />
-                      <Working message={m} />
+                      <div className="flex items-center justify-between gap-2">
+                        <Working message={m} />
+                        {m.source && SOURCE_NOTE[m.source] && (
+                          <span className="mt-2 text-[11px] text-muted-foreground">{SOURCE_NOTE[m.source]}</span>
+                        )}
+                      </div>
+                      {m === messages.at(-1) && !pending && !!m.suggestions?.length && (
+                        <div className="mt-3 flex flex-wrap gap-1.5">
+                          {m.suggestions.map((q) => (
+                            <button
+                              key={q}
+                              type="button"
+                              onClick={() => void send(q)}
+                              className="rounded-md border bg-background px-2.5 py-1.5 text-left text-[12px] text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground"
+                            >
+                              {q}
+                            </button>
+                          ))}
+                        </div>
+                      )}
                     </li>
                   )
                 )}
-                {pending && (
-                  <li className="flex items-center gap-2 text-[13px] text-muted-foreground" aria-live="polite">
-                    <span className="flex gap-1">
-                      <span className="size-1.5 animate-pulse rounded-full bg-primary" />
-                      <span className="size-1.5 animate-pulse rounded-full bg-primary [animation-delay:150ms]" />
-                      <span className="size-1.5 animate-pulse rounded-full bg-primary [animation-delay:300ms]" />
-                    </span>
-                    Checking your data and the regulations
-                  </li>
-                )}
+                {pending && <Thinking />}
               </ol>
             )}
           </div>

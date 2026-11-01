@@ -1,0 +1,16 @@
+[Unit]
+Description=SolarIntel edge agent
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=pi
+WorkingDirectory=/home/pi/solarintel/edge
+ExecStart=/usr/bin/npx tsx --env-file=agent.env src/agent.ts
+Restart=always
+RestartSec=10
+# The agent buffers to ./data, so restarts lose nothing.
+
+[Install]
+WantedBy=multi-user.target

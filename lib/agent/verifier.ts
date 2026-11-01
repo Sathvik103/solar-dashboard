@@ -37,18 +37,11 @@ export function verifyAgentResponse(
     if (hasRegulatoryKeywords) {
       const disclaimerNotice =
         '\n\n> **Verification notice:** Specific official policy documents could not be verified in the immediate knowledge retrieval. Please confirm final rates and eligibility with TSSPDCL or TGREDCO before application.'
-      if (!verifiedAnswer.includes('Verification Notice')) {
+      if (!verifiedAnswer.includes('Verification notice')) {
         verifiedAnswer += disclaimerNotice
         disclaimersAdded.push('Regulatory verification disclaimer')
       }
     }
-  }
-
-  // Check 3: Standard solar advisory disclaimer
-  const advisoryFooter =
-    '\n\n*Calculations are estimates based on standard regional solar insolation for Telangana (4.8 kWh/m²/day) and prevailing PM Surya Ghar / TSSPDCL regulations.*'
-  if (!verifiedAnswer.includes('Calculations are estimates')) {
-    verifiedAnswer += advisoryFooter
   }
 
   return {

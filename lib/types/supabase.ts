@@ -259,6 +259,8 @@ export interface Database {
           citations: Json
           tool_calls: Json
           trace_events: Json
+          artifacts: Json
+          suggestions: Json
           created_at: string
         }
         Insert: {
@@ -270,6 +272,8 @@ export interface Database {
           citations?: Json
           tool_calls?: Json
           trace_events?: Json
+          artifacts?: Json
+          suggestions?: Json
           created_at?: string
         }
         Update: {
@@ -281,6 +285,8 @@ export interface Database {
           citations?: Json
           tool_calls?: Json
           trace_events?: Json
+          artifacts?: Json
+          suggestions?: Json
           created_at?: string
         }
         Relationships: [
@@ -420,9 +426,33 @@ export interface Database {
         source: string; created_at: string
       }, 'dataset_type'>
       device_tokens: Tbl<{
-        id: string; user_id: string; name: string; token_hash: string; token_prefix: string
+        id: string; user_id: string; device_id: string | null; name: string; token_hash: string; token_prefix: string
         last_used_at: string | null; revoked_at: string | null; created_at: string
       }, 'user_id' | 'name' | 'token_hash' | 'token_prefix'>
+      devices: Tbl<{
+        id: string; user_id: string; name: string
+        kind: 'inverter' | 'energy_meter' | 'data_logger' | 'gateway'
+        protocol: 'http' | 'mqtt' | 'modbus_tcp' | 'vendor_cloud' | 'simulator'
+        vendor: string | null; model: string | null; serial_number: string | null
+        capacity_kw: number | null; reporting_interval_s: number
+        last_seen_at: string | null; last_power_w: number | null; archived_at: string | null
+        created_at: string; updated_at: string
+      }, 'user_id' | 'name' | 'kind'>
+      telemetry_samples: Tbl<{
+        device_id: string; user_id: string; ts: string
+        power_w: number | null; energy_wh_total: number | null; import_wh_total: number | null
+        export_wh_total: number | null; voltage_v: number | null; frequency_hz: number | null
+        temperature_c: number | null; status: string | null; received_at: string
+      }, 'device_id' | 'user_id' | 'ts'>
+      llm_usage: Tbl<{
+        id: number; user_id: string; model: string; purpose: string
+        input_tokens: number | null; output_tokens: number | null; latency_ms: number | null
+        outcome: 'ok' | 'error' | 'timeout'; created_at: string
+      }, 'user_id' | 'model' | 'outcome'>
+      assistant_cache: Tbl<{
+        user_id: string; cache_key: string; answer: string; payload: Json; hits: number
+        created_at: string; expires_at: string
+      }, 'user_id' | 'cache_key' | 'answer' | 'expires_at'>
       ml_predictions: Tbl<{
         id: string; user_id: string; prediction_type: string; prediction_date: string
         predicted_value: number; actual_value: number | null; unit: string; model_version: string
@@ -436,6 +466,10 @@ export interface Database {
       ingest_device_readings: {
         Args: { p_token_hash: string; p_readings: Json }
         Returns: number
+      }
+      ingest_telemetry: {
+        Args: { p_token_hash: string; p_samples: Json }
+        Returns: Json
       }
       match_document_chunks: {
         Args: {

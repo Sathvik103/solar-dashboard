@@ -163,6 +163,83 @@
   }
 }
 
+/* Motion ------------------------------------------------------------------------------------------ */
+@keyframes in-up {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes draw {
+  from { stroke-dashoffset: 1; }
+  to { stroke-dashoffset: 0; }
+}
+@keyframes flow {
+  to { stroke-dashoffset: -18; }
+}
+@keyframes shimmer {
+  from { background-position: -400px 0; }
+  to { background-position: 400px 0; }
+}
+@keyframes grow-y {
+  from { transform: scaleY(0); }
+  to { transform: scaleY(1); }
+}
+.grow-bar { transform-origin: bottom; animation: grow-y 700ms cubic-bezier(0.2, 0.7, 0.2, 1) both; }
+.guide-body h2 { font-size: 20px; line-height: 28px; font-weight: 600; letter-spacing: -0.01em; margin-top: 2.25rem; }
+.guide-body p { color: var(--foreground); }
+.guide-body ul { list-style: disc; padding-left: 1.25rem; }
+.guide-body li + li { margin-top: 0.25rem; }
+@keyframes sun-arc {
+  from { offset-distance: 0%; }
+  to { offset-distance: 100%; }
+}
+@keyframes curve-trace {
+  from { stroke-dashoffset: 1; }
+  to { stroke-dashoffset: 0; }
+}
+@keyframes fill-in {
+  from { opacity: 0; }
+  to { opacity: 0.1; }
+}
+/* Hero: sun travels the arc while the output curve traces underneath, in sync. */
+.hero-sun {
+  offset-path: path('M40,250 Q260,-40 480,250');
+  offset-rotate: 0deg;
+  animation: sun-arc 7s cubic-bezier(0.45, 0, 0.55, 1) infinite alternate;
+}
+.hero-curve { stroke-dasharray: 1; animation: curve-trace 7s cubic-bezier(0.45, 0, 0.55, 1) infinite alternate; }
+.hero-fill { animation: fill-in 7s ease-in-out infinite alternate; }
+
+@layer utilities {
+  .animate-in-up { animation: in-up 360ms cubic-bezier(0.2, 0.7, 0.2, 1) both; }
+  .stagger > * { animation: in-up 420ms cubic-bezier(0.2, 0.7, 0.2, 1) both; }
+  .stagger > *:nth-child(2) { animation-delay: 50ms; }
+  .stagger > *:nth-child(3) { animation-delay: 100ms; }
+  .stagger > *:nth-child(4) { animation-delay: 150ms; }
+  .stagger > *:nth-child(5) { animation-delay: 200ms; }
+  .stagger > *:nth-child(n + 6) { animation-delay: 250ms; }
+  .lift { transition: transform 180ms ease, border-color 180ms ease, box-shadow 180ms ease; }
+  .lift:hover {
+    transform: translateY(-2px);
+    border-color: color-mix(in srgb, var(--primary) 35%, var(--border));
+    box-shadow: 0 10px 24px -18px rgb(0 0 0 / 0.35);
+  }
+  .draw-path { stroke-dasharray: 1; animation: draw 900ms ease-out both; }
+  .flow-dash { animation: flow 1.2s linear infinite; }
+  .skeleton {
+    background: linear-gradient(90deg, var(--muted) 0%, var(--secondary) 50%, var(--muted) 100%);
+    background-size: 800px 100%;
+    animation: shimmer 1.4s linear infinite;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 1ms !important;
+  }
+}
+
 @layer utilities {
   /* Tabular figures for every number on screen. */
   .num {

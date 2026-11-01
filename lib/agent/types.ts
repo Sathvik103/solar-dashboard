@@ -1,4 +1,5 @@
 import type { Citation } from '@/lib/ai/citations'
+import type { Artifact } from './artifacts'
 
 export type UserIntent =
   | 'general_question'
@@ -8,6 +9,7 @@ export type UserIntent =
   | 'compare_options'
   | 'application_guide'
   | 'full_solar_plan'
+  | 'my_energy'
 
 export type TraceEventType =
   | 'intent_detection'
@@ -44,4 +46,8 @@ export type AgentExecutionResult = {
   verificationStatus: 'passed' | 'revised' | 'unverified'
   intent: UserIntent
   durationMs: number
+  artifacts: Artifact[]
+  suggestions: string[]
+  /** Which step produced the answer; only 'model' consumed language-model budget. */
+  source: 'guardrail' | 'deterministic' | 'cache' | 'model' | 'budget' | 'fallback'
 }

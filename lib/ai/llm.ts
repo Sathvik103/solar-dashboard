@@ -32,6 +32,55 @@ const ATTEMPT_TIMEOUT_MS = 25_000
 /**
  * Executes a text generation request with Gemini.
  */
+export type LLMResult = {
+  text: string
+  model: string
+  inputTokens: number | null
+  outputTokens: number | null
+  latencyMs: number
+}
+
+/** One logical answer: tries the model chain in order, returns text plus usage for budgeting. */
+export async function generateWithUsage(messages: LLMMessage[], options: GenerateOptions = {}): Promise<LLMResult> {
+  const apiKey = getGeminiApiKey()
+  if (!apiKey) throw new Error('Missing GEMINI_API_KEY')
+  const ai = new GoogleGenAI({ apiKey })
+  const models = options.model ? [options.model] : MODEL_CHAIN
+  const contents = messages
+    .filter((m) => m.role !== 'system')
+    .map((m) => ({ role: m.role === 'assistant' ? 'model' : 'user', parts: [{ text: m.content }] }))
+
+  const failures: string[] = []
+  for (const model of models) {
+    const t0 = Date.now()
+    try {
+      const response = await ai.models.generateContent({
+        model,
+        contents,
+        config: {
+          systemInstruction: options.systemPrompt ? { parts: [{ text: options.systemPrompt }] } : undefined,
+          temperature: options.temperature ?? 0.2,
+          maxOutputTokens: options.maxTokens ?? 8192,
+          abortSignal: AbortSignal.timeout(ATTEMPT_TIMEOUT_MS),
+        },
+      })
+      if (response.text) {
+        return {
+          text: response.text,
+          model,
+          inputTokens: response.usageMetadata?.promptTokenCount ?? null,
+          outputTokens: response.usageMetadata?.candidatesTokenCount ?? null,
+          latencyMs: Date.now() - t0,
+        }
+      }
+      failures.push(`${model}: empty response`)
+    } catch (error) {
+      failures.push(`${model}: ${errorMessage(error)}`)
+    }
+  }
+  throw new Error(`Gemini LLM generation failed: ${failures.join(' | ')}`)
+}
+
 export async function generateLLMResponse(
   messages: LLMMessage[],
   options: GenerateOptions = {}

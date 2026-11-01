@@ -10,6 +10,8 @@ import { EmptyState, Notice, Page, Stat, StatGrid, fmtInr, fmtNum } from '@/comp
 import { DailyEnergyChart, Legend, TodayOutputChart } from '@/components/charts/EnergyCharts'
 import GridExchangeCard from '@/components/GridExchangeCard'
 import AskButton from '@/components/assistant/AskButton'
+import CountUp from '@/components/motion/CountUp'
+import DeviceStatusDot from '@/components/devices/DeviceStatusDot'
 
 export const metadata = { title: 'Overview' }
 
@@ -65,21 +67,39 @@ export default async function DashboardPage() {
       <StatGrid>
         <Stat
           label="Output now"
-          value={today.currentKw != null ? fmtNum(today.currentKw, 2) : '—'}
+          value={
+            o.live ? (
+              <CountUp value={o.live.powerKw} decimals={2} />
+            ) : today.currentKw != null ? (
+              <CountUp value={today.currentKw} decimals={2} />
+            ) : (
+              '—'
+            )
+          }
           unit="kW"
           note={
-            basis ? (calibration ? 'Modelled, calibrated to your readings' : 'Modelled from live weather') : 'Needs a system size'
+            o.live ? (
+              <span className="inline-flex items-center gap-1.5">
+                <DeviceStatusDot status="online" showLabel={false} />
+                Measured by {o.live.devices} device{o.live.devices > 1 ? 's' : ''}
+                {o.live.simulated ? ' (simulated)' : ''}
+              </span>
+            ) : basis ? (
+              calibration ? 'Modelled, calibrated to your readings' : 'Modelled from live weather'
+            ) : (
+              'Needs a system size'
+            )
           }
         />
         <Stat
           label="Today"
-          value={todayKwh != null ? fmtNum(todayKwh, 1) : '—'}
+          value={todayKwh != null ? <CountUp value={todayKwh} decimals={1} /> : '—'}
           unit="kWh"
           note={todayKwh == null ? 'No data yet' : todayIsLogged ? 'Logged reading' : 'Forecast for the full day'}
         />
         <Stat
           label="Saved this month"
-          value={o.monthToDate?.savedInr != null ? fmtInr(o.monthToDate.savedInr) : '—'}
+          value={o.monthToDate?.savedInr != null ? <CountUp value={o.monthToDate.savedInr} prefix="₹" /> : '—'}
           tone={o.monthToDate?.savedInr ? 'positive' : undefined}
           note={
             o.monthToDate

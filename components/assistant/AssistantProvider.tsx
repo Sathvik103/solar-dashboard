@@ -2,7 +2,8 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import type { Citation } from '@/lib/ai/citations'
-import type { TraceEvent, ToolExecutionRecord } from '@/lib/agent/types'
+import type { TraceEvent, ToolExecutionRecord, AgentExecutionResult } from '@/lib/agent/types'
+import type { Artifact } from '@/lib/agent/artifacts'
 
 export type AssistantMessage = {
   id: string
@@ -11,6 +12,9 @@ export type AssistantMessage = {
   citations?: Citation[]
   traceEvents?: TraceEvent[]
   toolsUsed?: ToolExecutionRecord[]
+  artifacts?: Artifact[]
+  suggestions?: string[]
+  source?: AgentExecutionResult['source']
   failed?: boolean
 }
 
@@ -47,6 +51,8 @@ type ApiMessage = {
   citations?: Citation[]
   traceEvents?: TraceEvent[]
   toolCalls?: ToolExecutionRecord[]
+  artifacts?: Artifact[]
+  suggestions?: string[]
 }
 
 export default function AssistantProvider({ children }: { children: React.ReactNode }) {
@@ -94,6 +100,8 @@ export default function AssistantProvider({ children }: { children: React.ReactN
           citations: m.citations,
           traceEvents: m.traceEvents,
           toolsUsed: m.toolCalls,
+          artifacts: m.artifacts,
+          suggestions: m.suggestions,
         }))
       )
     } catch {
@@ -133,6 +141,9 @@ export default function AssistantProvider({ children }: { children: React.ReactN
             citations: data.citations ?? [],
             traceEvents: data.traceEvents ?? [],
             toolsUsed: data.toolsUsed ?? [],
+            artifacts: data.artifacts ?? [],
+            suggestions: data.suggestions ?? [],
+            source: data.source,
           },
         ])
       } catch (err) {

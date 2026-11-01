@@ -26,9 +26,13 @@ export type ExecutionPlan = {
  */
 export function planAgentExecution(
   query: string,
-  userProfile?: PlannerProfile | null
+  userProfile?: PlannerProfile | null,
+  /** The previous user message, used to resolve follow-ups such as "what about 5 kW?" or "and the subsidy?". */
+  previousQuery?: string
 ): ExecutionPlan {
-  const lower = query.toLowerCase()
+  const isFollowUp = !!previousQuery && query.trim().split(/\s+/).length <= 8
+  // Current message first, so its own numbers (e.g. a new kW size) take precedence over earlier ones.
+  const lower = (isFollowUp ? `${query} ${previousQuery}` : query).toLowerCase()
   const tools: { toolName: string; params: Record<string, unknown> }[] = []
   let intent: UserIntent = 'general_question'
   let retrievalQuery: string | undefined = query
@@ -37,6 +41,22 @@ export function planAgentExecution(
   const roofArea = userProfile?.roofAreaSqft ?? undefined
   const missingUnits =
     monthlyUnits == null ? ['monthlyUnitsKwh (ask for their monthly units, or to fill their solar profile)'] : []
+
+  // 0. Questions about the user's own recorded data
+  if (
+    /\bmy (generation|system|output|readings?|devices?|inverter|savings|performance|production|export|usage|consumption)\b/.test(lower) ||
+    /\bhow (much|did) (did )?(i|my)\b.*\b(save|generate|produce|export|perform)/.test(lower) ||
+    /\b(underperform|performing|this month|last month|last week)\b/.test(lower)
+  ) {
+    tools.push({ toolName: 'getEnergySummary', params: {} })
+    return {
+      intent: 'my_energy',
+      toolsToExecute: tools,
+      retrievalQuery: undefined,
+      missingInputs: [],
+      reasoning: 'User asked about their own recorded data. Scheduled getEnergySummary; no document retrieval needed.',
+    }
+  }
 
   // 1. Check for Full Plan Request
   if (
@@ -108,6 +128,12 @@ export function planAgentExecution(
     lower.includes('tariff')
   ) {
     intent = 'financial_roi'
+
+    // "bill for 450 units" -> slab breakdown for that consumption
+    const unitsMatch = lower.match(/(\d{2,5})\s*(units|kwh)\b/)
+    if (unitsMatch && /bill|tariff|slab|charge/.test(lower)) {
+      tools.push({ toolName: 'getTariffInformation', params: { monthlyUnitsKwh: Number(unitsMatch[1]), category: 'domestic' } })
+    }
 
     // Extract capacity if specified (e.g. "5kw", "3 kw")
     const capMatch = lower.match(/(\d+(?:\.\d+)?)\s*(?:kw|kilowatt)/i)
