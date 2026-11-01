@@ -55,7 +55,7 @@ npm install
 npm run dev
 ```
 
-Apply `supabase/migrations/*.sql` in order (001–011; 012 drops four unused empty tables and is optional). Run `npm run ingest:knowledge` once to load the knowledge base; it needs `SUPABASE_SERVICE_ROLE_KEY`
+Apply `supabase/migrations/*.sql` in order (001–012). Run `npm run ingest:knowledge` once to load the knowledge base; it needs `SUPABASE_SERVICE_ROLE_KEY`
 because the document tables are writable only by the service role.
 
 The assistant uses `gemini-3.5-flash`, falling back to `gemini-3.1-flash-lite` (25 s per attempt). Set

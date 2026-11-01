@@ -79,7 +79,7 @@ Document extraction shares the assistant's daily model budget (`llm_usage`) and 
 
 Migrations live in `supabase/migrations` and are applied in order.
 
-- **001–011:** applied. 011 adds the net-metering columns, a period check and a unique period per user to
+- **001–012:** applied. 011 adds the net-metering columns, a period check and a unique period per user to
   `electricity_bills`.
-- **012:** not applied yet. It drops four unused, empty tables: `recommendation_history`, `saved_scenarios`,
+- **012** drops four unused, empty tables: `recommendation_history`, `saved_scenarios`,
   `dashboard_preferences` and `tariff_history`.
