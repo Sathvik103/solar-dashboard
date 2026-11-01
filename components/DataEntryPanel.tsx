@@ -8,7 +8,6 @@ import { Card } from '@/components/ui/card'
 import { cn } from '@/lib/utils'
 import {
   importCsvAction,
-  logConsumptionAction,
   logGenerationAction,
   type EnergyActionState,
 } from '@/actions/energy'
@@ -46,14 +45,12 @@ function Field({
 
 const TABS = [
   { id: 'reading', label: 'Daily reading' },
-  { id: 'bill', label: 'Monthly bill' },
   { id: 'csv', label: 'Import CSV' },
 ] as const
 
 export default function DataEntryPanel() {
   const [tab, setTab] = useState<(typeof TABS)[number]['id']>('reading')
   const [gen, genAction, genPending] = useActionState(logGenerationAction, undefined as EnergyActionState | undefined)
-  const [bill, billAction, billPending] = useActionState(logConsumptionAction, undefined as EnergyActionState | undefined)
   const [csv, csvAction, csvPending] = useActionState(importCsvAction, undefined as EnergyActionState | undefined)
   const today = new Date().toISOString().slice(0, 10)
 
@@ -93,27 +90,7 @@ export default function DataEntryPanel() {
               <Feedback state={gen} />
               {!gen && (
                 <p className="text-[12px] text-muted-foreground">
-                  Use the day total from your inverter app or net meter. Saving the same date again replaces it.
-                </p>
-              )}
-            </div>
-          </form>
-        )}
-
-        {tab === 'bill' && (
-          <form action={billAction} className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5 lg:items-end">
-            <Field id="month" label="Billing month" type="month" max={today.slice(0, 7)} required />
-            <Field id="consumptionKwh" label="Units (kWh)" type="number" step="1" min="0" required />
-            <Field id="billAmount" label="Bill amount (₹)" type="number" step="1" min="0" required />
-            <Field id="peakDemandKw" label="Peak demand (kW)" type="number" step="0.1" min="0" />
-            <Button type="submit" disabled={billPending}>
-              {billPending ? 'Saving' : 'Save bill'}
-            </Button>
-            <div className="sm:col-span-2 lg:col-span-5">
-              <Feedback state={bill} />
-              {!bill && (
-                <p className="text-[12px] text-muted-foreground">
-                  Bills drive sizing, the tariff used for savings, and the consumption forecast export.
+                  Use the day total from your inverter app or net meter. Saving the same date again replaces it. Monthly bills go under Bills.
                 </p>
               )}
             </div>

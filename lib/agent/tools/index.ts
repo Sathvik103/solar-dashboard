@@ -12,6 +12,7 @@ import { getConsumptionHistoryTool, GetConsumptionHistorySchema } from './getCon
 import { getRegionalStatisticsTool, GetRegionalStatisticsSchema } from './getRegionalStatistics'
 import { getMLPredictionsTool, GetMLPredictionsSchema } from './getMLPredictions'
 import { getEnergySummaryTool, GetEnergySummarySchema } from './getEnergySummary'
+import { getNetMeteringLedgerTool, GetNetMeteringLedgerSchema } from './getNetMeteringLedger'
 
 export type AgentToolDefinition = {
   name: string
@@ -92,6 +93,12 @@ export const AGENT_TOOLS: Record<string, AgentToolDefinition> = {
     description: 'Measured monthly solar irradiance and temperature (ERA5) for a Telangana district, plus curated regional statistics when available.',
     schema: GetRegionalStatisticsSchema,
     execute: getRegionalStatisticsTool,
+  },
+  getNetMeteringLedger: {
+    name: 'getNetMeteringLedger',
+    description: "The signed-in user's net-metering credit for the settlement year: banked units, forecast to 31 March and payout value.",
+    schema: GetNetMeteringLedgerSchema,
+    execute: getNetMeteringLedgerTool,
   },
   getEnergySummary: {
     name: 'getEnergySummary',

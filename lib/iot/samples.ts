@@ -29,8 +29,6 @@ export const TelemetryBatchSchema = z.object({
   samples: z.array(TelemetrySampleSchema).min(1).max(MAX_SAMPLES_PER_BATCH),
 })
 
-export type TelemetrySample = z.infer<typeof TelemetrySampleSchema>
-
 export type IngestResult = {
   received: number
   accepted: number

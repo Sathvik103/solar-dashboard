@@ -16,6 +16,7 @@ const NAV = [
   { href: '/dashboard', label: 'Overview' },
   { href: '/devices', label: 'Devices' },
   { href: '/history', label: 'Energy log' },
+  { href: '/billing', label: 'Bills' },
   { href: '/analysis', label: 'Planner' },
   { href: '/knowledge', label: 'Regulations' },
 ]

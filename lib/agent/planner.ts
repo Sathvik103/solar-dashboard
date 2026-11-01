@@ -42,6 +42,18 @@ export function planAgentExecution(
   const missingUnits =
     monthlyUnits == null ? ['monthlyUnitsKwh (ask for their monthly units, or to fill their solar profile)'] : []
 
+  // 0a. Net-metering credit and year-end settlement
+  if (/\b(credit|banked|bank balance|carr(y|ied) forward|settlement|31 march|march 31|year[- ]end|appc|unused units|surplus units)\b/.test(lower)) {
+    tools.push({ toolName: 'getNetMeteringLedger', params: {} })
+    return {
+      intent: 'net_metering_credit',
+      toolsToExecute: tools,
+      retrievalQuery: undefined,
+      missingInputs: [],
+      reasoning: 'User asked about banked net-metering credit. Scheduled getNetMeteringLedger.',
+    }
+  }
+
   // 0. Questions about the user's own recorded data
   if (
     /\bmy (generation|system|output|readings?|devices?|inverter|savings|performance|production|export|usage|consumption)\b/.test(lower) ||

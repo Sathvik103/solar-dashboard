@@ -46,4 +46,3 @@ export const MLPredictionIngestSchema = z.object({
   metadata: z.record(z.string(), z.unknown()).optional().describe('Arbitrary hyperparameters, confidence bounds, or feature importances'),
 })
 
-export type MLPredictionIngest = z.infer<typeof MLPredictionIngestSchema>

@@ -10,6 +10,7 @@ export type UserIntent =
   | 'application_guide'
   | 'full_solar_plan'
   | 'my_energy'
+  | 'net_metering_credit'
 
 export type TraceEventType =
   | 'intent_detection'

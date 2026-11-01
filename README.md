@@ -8,9 +8,13 @@ Next.js 16 + Supabase app that helps Telangana households size, price and monito
   the model's calibration, 30-day logged vs modelled generation, grid exchange and the sizing recommendation.
 - **Devices**: register inverters, meters and loggers; live power, energy today, data completeness, 7-day
   energy, token rotation, and a setup guide per protocol. See `docs/iot-pipeline.md` and `edge/README.md`.
-- **Energy log**: add daily readings, monthly bills or CSV imports; per-day logged vs modelled table.
+- **Energy log**: add daily readings or CSV imports; per-day logged vs modelled table.
+- **Bills**: net-metering credit ledger for the settlement year (April to 31 March): credit now, projected
+  balance on 31 March, its APPC payout and what it would be worth if used instead. Upload a bill (PDF or photo)
+  to extract it, confirm the fields, and check it against the tariff, the previous bill and your meter data.
 - **Planner**: what-if sizing with climate-driven monthly yield, slab-based savings, 25-year cashflow, size options,
-  panel technology and feasibility checks.
+  panel technology and feasibility checks, and an installer quote checker (subsidy, DCR, price per kW, inverter
+  ratio, sanctioned load).
 - **Regulations**: retrieval over the knowledge base with sources and a retrieval-quality benchmark.
 - **Settings**: profile, sanctioned load and roof.
 - **Assistant**: a panel on every page (Ctrl+J) with stored conversations, charts and tables built from the
@@ -32,7 +36,8 @@ Nothing on the dashboard is hard-coded or randomly generated.
 | Model calibration | Least-squares fit of the model to every logged day in the last 90 days with matching ERA5 weather (`lib/solar/calibration.ts`); needs 7 days, factor clamped to 0.5–1.3, error shown before and after. |
 | Planner savings | Month-by-month: climate-driven yield for each month, valued against the LT-I slab ladder. |
 | Logged generation, exports, imports | Entered by you (form or CSV) on **History**, or pushed by your inverter/logger to `POST /api/telemetry` → `solar_generation_history`. |
-| Consumption, bills, tariff | Entered by you / CSV → `consumption_history`. Tariff = profile value, else bill-derived, else the marginal LT-I slab rate. |
+| Consumption, bills, tariff | Entered by you / CSV → `consumption_history`; saved bills → `electricity_bills`. Tariff = profile value, else bill-derived, else the marginal LT-I slab rate. |
+| Credit ledger | Bills first (their printed closing balance wins), then logged meter months, then a labelled forecast (`lib/billing`). |
 | LT-I tariff slabs | TGSPDCL schedule FY 2025-26, retained for FY 2026-27 (`lib/calculations/tariffs.ts`). Excludes electricity duty, FSA and ToD. |
 | Net-metering export credit | TGERC APPC FY 2025-26, ₹5.330/kWh. |
 | PM Surya Ghar subsidy | MNRE: ₹30k/kW for the first 2 kW + ₹18k for the 3rd kW, capped at ₹78k (pro-rated). |
@@ -50,7 +55,7 @@ npm install
 npm run dev
 ```
 
-Apply `supabase/migrations/*.sql` in order (001–010). Run `npm run ingest:knowledge` once to load the knowledge base; it needs `SUPABASE_SERVICE_ROLE_KEY`
+Apply `supabase/migrations/*.sql` in order (001–011; 012 drops four unused empty tables and is optional). Run `npm run ingest:knowledge` once to load the knowledge base; it needs `SUPABASE_SERVICE_ROLE_KEY`
 because the document tables are writable only by the service role.
 
 The assistant uses `gemini-3.5-flash`, falling back to `gemini-3.1-flash-lite` (25 s per attempt). Set
@@ -64,7 +69,7 @@ The assistant uses `gemini-3.5-flash`, falling back to `gemini-3.1-flash-lite` (
 
 - `GET /api/health` returns 200 / 503 with a database check (use for uptime monitors).
 - All data APIs require a session and return `Cache-Control: private, no-store`.
-- Rate limits for chat, telemetry, search, evaluation and sign-in are defined in one place (`lib/rate-limit`, see
+- Rate limits for chat, telemetry, document extraction, search, evaluation and sign-in are defined in one place (`lib/rate-limit`, see
   `docs/rate-limiting.md`); global via Upstash Redis when `UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN` are set.
 - `proxy.ts` (Next 16 successor to `middleware.ts`) gates app routes; security headers are set in `next.config.ts`.
 - Device telemetry: create a token under **Profile → Connected devices**, then
@@ -75,6 +80,10 @@ The assistant uses `gemini-3.5-flash`, falling back to `gemini-3.1-flash-lite` (
 - CI (`.github/workflows/ci.yml`) runs typecheck, lint, tests and a production build on every push/PR.
 - Enable **Leaked password protection** in Supabase → Authentication → Settings (the one advisor warning left).
 - `GET /api/ml/dataset` exports the user's real history for the external Python pipeline — see `docs/ml-integration.md`.
+
+## Docs
+
+`docs/architecture.md`, `docs/assistant.md`, `docs/iot-pipeline.md`, `docs/rate-limiting.md`, `docs/ml-integration.md`.
 
 ## Known limitations
 
@@ -87,3 +96,4 @@ The assistant uses `gemini-3.5-flash`, falling back to `gemini-3.1-flash-lite` (
 - The Analysis Studio is a what-if simulator: its inputs start from your profile (or generic examples if you have none).
   It uses measured climatology from `/api/climate`, falling back to a built-in reference table only if that fails.
 - `public.regional_statistics` is intentionally empty; populate it only from a cited official source.
+- Bill extraction is a transcription aid; always confirm the fields before saving. Uploaded files are not stored.

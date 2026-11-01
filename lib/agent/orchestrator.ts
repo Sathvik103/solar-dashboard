@@ -33,7 +33,7 @@ const HISTORY_MESSAGES = 6
 const HISTORY_CHARS = 700
 
 /** Intents that never need regulation documents (saves an embedding call per message). */
-const NO_RETRIEVAL: UserIntent[] = ['my_energy']
+const NO_RETRIEVAL: UserIntent[] = ['my_energy', 'net_metering_credit']
 
 /**
  * Assistant pipeline. Cheapest steps first; the language model is the last resort.

@@ -4,7 +4,6 @@ import { getUserConsumptionHistory, computeEnergyStatistics } from '@/lib/dal/an
 // The user is always the authenticated session user; the model cannot choose whose data to read.
 export const GetConsumptionHistorySchema = z.object({})
 
-export type GetConsumptionHistoryInput = z.infer<typeof GetConsumptionHistorySchema>
 
 export async function getConsumptionHistoryTool() {
   try {

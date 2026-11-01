@@ -8,7 +8,7 @@ export default function robots(): MetadataRoute.Robots {
         userAgent: '*',
         allow: ['/', '/guides'],
         // Signed-in app pages and APIs are private and have no search value.
-        disallow: ['/api/', '/dashboard', '/devices', '/history', '/analysis', '/knowledge', '/profile'],
+        disallow: ['/api/', '/dashboard', '/devices', '/history', '/billing', '/analysis', '/knowledge', '/profile'],
       },
     ],
     sitemap: `${SITE.url}/sitemap.xml`,

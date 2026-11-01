@@ -8,8 +8,6 @@ import {
   type ConsumptionRecord,
   type GenerationRecord,
   type RegionalStatRecord,
-  type SavedScenario,
-  type RecommendationRecord,
   type SolarSystemRecord,
   computeEnergyStatistics,
 } from '@/lib/types/analytics'
@@ -19,8 +17,6 @@ export type {
   ConsumptionRecord,
   GenerationRecord,
   RegionalStatRecord,
-  SavedScenario,
-  RecommendationRecord,
   SolarSystemRecord,
 }
 
@@ -215,60 +211,4 @@ export async function getRegionalStatistics(district = 'Hyderabad'): Promise<Reg
     co2ReductionTonnes: Number(data.co2_reduction_tonnes),
     source: data.source,
   }
-}
-
-function mapScenario(d: Tables['saved_scenarios']['Row']): SavedScenario {
-  return {
-    id: d.id,
-    userId: d.user_id,
-    name: d.name,
-    monthlyConsumptionKwh: Number(d.monthly_consumption_kwh),
-    monthlyBillInr: Number(d.monthly_bill_inr),
-    roofAreaSqft: Number(d.roof_area_sqft),
-    tariffInr: Number(d.tariff_inr),
-    capacityKw: Number(d.capacity_kw),
-    subsidyInr: Number(d.subsidy_inr),
-    shadingLevel: d.shading_level,
-    calculatedSavingsInr: Number(d.calculated_savings_inr),
-    calculatedPaybackYears: Number(d.calculated_payback_years),
-    createdAt: d.created_at,
-  }
-}
-
-export async function getSavedScenarios(): Promise<SavedScenario[]> {
-  const user = await requireUser()
-  const supabase = await createSupabaseServerClient()
-  const { data, error } = await supabase
-    .from('saved_scenarios')
-    .select('*')
-    .eq('user_id', user.id)
-    .order('created_at', { ascending: false })
-  if (error) throw new Error(`Failed to load scenarios: ${error.message}`)
-  return (data ?? []).map(mapScenario)
-}
-
-export async function saveScenario(
-  input: Omit<SavedScenario, 'id' | 'userId' | 'createdAt'>
-): Promise<SavedScenario> {
-  const user = await requireUser()
-  const supabase = await createSupabaseServerClient()
-  const { data, error } = await supabase
-    .from('saved_scenarios')
-    .insert({
-      user_id: user.id,
-      name: input.name,
-      monthly_consumption_kwh: input.monthlyConsumptionKwh,
-      monthly_bill_inr: input.monthlyBillInr,
-      roof_area_sqft: input.roofAreaSqft,
-      tariff_inr: input.tariffInr,
-      capacity_kw: input.capacityKw,
-      subsidy_inr: input.subsidyInr,
-      shading_level: input.shadingLevel,
-      calculated_savings_inr: input.calculatedSavingsInr,
-      calculated_payback_years: input.calculatedPaybackYears,
-    })
-    .select()
-    .single()
-  if (error || !data) throw new Error(`Failed to save scenario: ${error?.message}`)
-  return mapScenario(data)
 }

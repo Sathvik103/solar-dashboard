@@ -372,8 +372,12 @@ export interface Database {
         id: string; user_id: string; billing_period_start: string; billing_period_end: string
         units_consumed: number; fixed_charge: number; energy_charge: number; taxes: number
         other_charges: number | null; total_bill: number; tariff_category: string
-        tariff_rate: number; created_at: string
-      }, 'user_id' | 'billing_period_start' | 'billing_period_end' | 'units_consumed' | 'energy_charge' | 'total_bill' | 'tariff_rate'>
+        tariff_rate: number; created_at: string; updated_at: string
+        import_kwh: number | null; export_kwh: number | null
+        banked_opening_kwh: number | null; banked_closing_kwh: number | null; billed_units: number | null
+        electricity_duty: number | null; fuel_surcharge: number | null
+        source: 'manual' | 'upload'; checks: Json
+      }, 'user_id' | 'billing_period_start' | 'billing_period_end' | 'units_consumed' | 'total_bill' | 'tariff_rate'>
       solar_systems: Tbl<{
         id: string; user_id: string; capacity_kw: number; panel_count: number | null
         panel_wattage: number | null; inverter_capacity_kw: number | null; installation_cost: number
@@ -400,26 +404,6 @@ export interface Database {
         average_monthly_savings: number; co2_reduction_tonnes: number; source: string
         created_at: string
       }, 'district' | 'city' | 'record_date'>
-      tariff_history: Tbl<{
-        id: string; state: string; discom: string; category: string; slab_name: string
-        min_units: number; max_units: number; rate_per_unit: number; effective_from: string
-        effective_to: string | null; source: string; created_at: string
-      }, 'slab_name' | 'min_units' | 'max_units' | 'rate_per_unit' | 'effective_from'>
-      recommendation_history: Tbl<{
-        id: string; user_id: string; query: string; recommended_capacity_kw: number
-        alternative_capacity_kw: number | null; estimated_generation: number
-        estimated_savings: number; net_cost: number; payback_years: number
-        confidence: number | null; reasoning: string; evidence: Json; created_at: string
-      }, 'user_id' | 'query' | 'recommended_capacity_kw' | 'estimated_generation' | 'estimated_savings' | 'net_cost' | 'payback_years' | 'reasoning'>
-      saved_scenarios: Tbl<{
-        id: string; user_id: string; name: string; monthly_consumption_kwh: number
-        monthly_bill_inr: number; roof_area_sqft: number; tariff_inr: number; capacity_kw: number
-        subsidy_inr: number; shading_level: string; calculated_savings_inr: number
-        calculated_payback_years: number; created_at: string
-      }, 'user_id' | 'name' | 'monthly_consumption_kwh' | 'monthly_bill_inr' | 'roof_area_sqft' | 'capacity_kw' | 'calculated_savings_inr' | 'calculated_payback_years'>
-      dashboard_preferences: Tbl<{
-        id: string; user_id: string; enabled_widgets: Json; created_at: string; updated_at: string
-      }, 'user_id'>
       ml_datasets: Tbl<{
         id: string; user_id: string | null; dataset_type: string; feature_schema: Json
         record_count: number; date_range_start: string | null; date_range_end: string | null

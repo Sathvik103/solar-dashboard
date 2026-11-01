@@ -4,7 +4,6 @@ import { revalidatePath } from 'next/cache'
 import { requireUser } from '@/lib/auth/session'
 import { upsertConsumptionRecords, upsertGenerationRecords } from '@/lib/dal/analytics'
 import {
-  ConsumptionEntrySchema,
   GenerationEntrySchema,
   parseConsumptionCsv,
   parseGenerationCsv,
@@ -55,33 +54,6 @@ export async function logGenerationAction(
   }
   refresh()
   return { success: `Saved generation for ${parsed.data.recordDate}.` }
-}
-
-export async function logConsumptionAction(
-  _prev: EnergyActionState | undefined,
-  formData: FormData
-): Promise<EnergyActionState> {
-  const unauth = await guard()
-  if (unauth) return { error: unauth }
-
-  const month = String(formData.get('month') ?? '')
-  const parsed = ConsumptionEntrySchema.safeParse({
-    recordDate: /^\d{4}-\d{2}$/.test(month) ? `${month}-01` : month,
-    consumptionKwh: formData.get('consumptionKwh'),
-    billAmount: formData.get('billAmount'),
-    peakDemandKw: formData.get('peakDemandKw') || null,
-    unitsExported: formData.get('unitsExported') || null,
-    tariffRate: formData.get('tariffRate') || null,
-  })
-  if (!parsed.success) return { error: parsed.error.issues.map((i) => i.message).join('; ') }
-
-  try {
-    await upsertConsumptionRecords([parsed.data], 'user_entered')
-  } catch (err) {
-    return { error: (err as Error).message }
-  }
-  refresh()
-  return { success: `Saved bill for ${month}.` }
 }
 
 export async function importCsvAction(

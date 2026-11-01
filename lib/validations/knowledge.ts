@@ -23,5 +23,4 @@ export const KnowledgeIngestSchema = z.object({
   status: z.enum(['draft', 'published', 'archived']).default('published'),
 })
 
-export type KnowledgeSearchInput = z.infer<typeof KnowledgeSearchSchema>
 export type KnowledgeIngestInput = z.infer<typeof KnowledgeIngestSchema>

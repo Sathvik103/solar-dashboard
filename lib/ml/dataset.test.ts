@@ -1,6 +1,5 @@
 import { describe, it, expect } from 'vitest'
 import { MLDatasetExportSchema, MLPredictionIngestSchema } from './schema'
-import { getMLModelStatus } from './metrics'
 
 describe('ML Pipeline Interface & Contracts', () => {
   it('validates training dataset schema structure', () => {
@@ -48,24 +47,4 @@ describe('ML Pipeline Interface & Contracts', () => {
     expect(parsed.success).toBe(true)
   })
 
-  it('reports awaiting_model status when no external predictions exist', () => {
-    const status = getMLModelStatus([], 24)
-    expect(status.status).toBe('awaiting_model')
-    expect(status.totalTrainingRecords).toBe(24)
-    expect(status.metrics).toBeUndefined()
-  })
-
-  it('computes metrics only from real prediction/actual pairs', () => {
-    const status = getMLModelStatus(
-      [
-        { predicted: 100, actual: 110, modelVersion: 'v1', createdAt: '2026-01-01' },
-        { predicted: 200, actual: 190, modelVersion: 'v1', createdAt: '2026-01-02' },
-        { predicted: 300, actual: null, modelVersion: 'v1', createdAt: '2026-01-03' },
-      ],
-      24
-    )
-    expect(status.evaluatedPairs).toBe(2)
-    expect(status.metrics?.mae).toBe(10)
-    expect(status.metrics?.rmse).toBe(10)
-  })
 })

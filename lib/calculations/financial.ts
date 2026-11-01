@@ -35,11 +35,6 @@ export type YearByYearCashflow = {
   netCashflowInr: number
 }
 
-export type SubsidyAdjustment = {
-  grossCost: number
-  subsidyAmount: number
-  netCost: number
-}
 
 /**
  * Calculates Net Present Value (NPV) over project lifetime.
@@ -170,23 +165,3 @@ export function calculatePMSuryaGharSubsidy(capacityKw: number): number {
   return Math.min(s.capInr, Math.round(tier1 + tier2))
 }
 
-/**
- * Applies PM Surya Ghar subsidy to gross system cost.
- */
-export function adjustForSubsidy(
-  grossCost: number,
-  capacityOrAmount: number
-): SubsidyAdjustment {
-  const subsidyAmount =
-    capacityOrAmount > 0 && capacityOrAmount <= 100
-      ? calculatePMSuryaGharSubsidy(capacityOrAmount)
-      : capacityOrAmount
-
-  const netCost = Math.max(0, parseFloat((grossCost - subsidyAmount).toFixed(2)))
-
-  return {
-    grossCost,
-    subsidyAmount,
-    netCost,
-  }
-}

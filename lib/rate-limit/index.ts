@@ -20,6 +20,8 @@ export const POLICIES = {
   knowledgeSearch: { limit: 30, windowMs: 60_000 },
   /** Retrieval benchmark per user; runs 30 embedding calls. */
   evaluation: { limit: 3, windowMs: 10 * 60_000 },
+  /** Bill and quote reading per user; each call sends a document to the model. */
+  documentExtract: { limit: 10, windowMs: 60 * 60_000 },
   /** Sign-in and sign-up attempts per client IP. */
   auth: { limit: 10, windowMs: 15 * 60_000 },
 } as const satisfies Record<string, { limit: number; windowMs: number }>

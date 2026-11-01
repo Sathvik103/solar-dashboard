@@ -147,10 +147,26 @@ export function buildArtifacts(records: ToolExecutionRecord[]): Artifact[] {
     })
   }
 
+  const ledger = out(records, 'getNetMeteringLedger')
+  if (ledger && Array.isArray(ledger.months) && (ledger.months as unknown[]).length > 1) {
+    artifacts.push({
+      type: 'chart',
+      id: 'credit-balance',
+      title: `Net-metering credit, ${ledger.year}`,
+      kind: 'line',
+      unit: 'kWh',
+      xKey: 'month',
+      series: [{ key: 'credit', label: 'Credit balance' }],
+      data: (ledger.months as { month: string; creditAfterKwh: number }[]).map((m) => ({ month: m.month.slice(2), credit: m.creditAfterKwh })),
+      note: 'Includes forecast months where marked in the Bills page.',
+    })
+  }
+
   return artifacts.slice(0, 3)
 }
 
-const SUGGESTIONS: Record<UserIntent | 'my_energy', string[]> = {
+const SUGGESTIONS: Record<UserIntent, string[]> = {
+  net_metering_credit: ['How should I use my banked units?', 'Check my latest bill', 'How is surplus export paid?'],
   full_solar_plan: ['Compare 3 kW and 5 kW for me', 'What documents do I need to apply?', 'How long until it pays back?'],
   compare_options: ['Which size has the fastest payback?', 'What would my bill be with the recommended size?', 'How much roof area do I need?'],
   financial_roi: ['Show my bill before and after solar', 'How is surplus export paid?', 'Compare system sizes for me'],

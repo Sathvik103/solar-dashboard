@@ -21,11 +21,14 @@ export default function CommandPalette({ open, onOpenChange }: { open: boolean; 
       { id: 'overview', label: 'Overview', hint: 'Today, savings, model', group: 'Go to', run: go('/dashboard') },
       { id: 'devices', label: 'Devices', hint: 'Live inverters and meters', group: 'Go to', run: go('/devices') },
       { id: 'log', label: 'Energy log', hint: 'Readings and bills', group: 'Go to', run: go('/history') },
+      { id: 'billing', label: 'Bills and credits', hint: 'Net-metering credit, bill check', group: 'Go to', run: go('/billing') },
       { id: 'planner', label: 'Planner', hint: 'Size and cost a system', group: 'Go to', run: go('/analysis') },
       { id: 'rules', label: 'Regulations', hint: 'Search the documents', group: 'Go to', run: go('/knowledge') },
       { id: 'settings', label: 'Settings', hint: 'Profile and roof', group: 'Go to', run: go('/profile') },
       { id: 'add-device', label: 'Add a device', hint: 'Register an inverter or meter', group: 'Actions', run: go('/devices') },
-      { id: 'add-reading', label: 'Log a reading', hint: 'Daily total or bill', group: 'Actions', run: go('/history') },
+      { id: 'add-reading', label: 'Log a reading', hint: 'Daily total', group: 'Actions', run: go('/history') },
+      { id: 'check-bill', label: 'Check a bill', hint: 'Upload a TSSPDCL bill', group: 'Actions', run: go('/billing') },
+      { id: 'check-quote', label: 'Check an installer quote', hint: 'In the Planner', group: 'Actions', run: go('/analysis') },
       { id: 'guide-tariff', label: 'Telangana tariff guide', hint: 'Public guide', group: 'Actions', run: go('/guides/telangana-electricity-tariff') },
     ]
   }, [router])

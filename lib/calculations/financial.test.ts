@@ -4,7 +4,6 @@ import {
   calculate25YearSavings,
   calculatePaybackPeriod,
   calculatePMSuryaGharSubsidy,
-  adjustForSubsidy,
 } from './financial'
 
 describe('Financial Calculation Engine', () => {
@@ -19,12 +18,6 @@ describe('Financial Calculation Engine', () => {
     expect(calculatePMSuryaGharSubsidy(10)).toBe(78000)
   })
 
-  it('adjusts gross cost by PM Surya Ghar subsidy correctly', () => {
-    const res = adjustForSubsidy(195000, 3)
-    expect(res.grossCost).toBe(195000)
-    expect(res.subsidyAmount).toBe(78000)
-    expect(res.netCost).toBe(117000)
-  })
 
   it('calculates simple and dynamic payback period accurately', () => {
     const payback = calculatePaybackPeriod(117000, 32000, 0.03, 0.005)

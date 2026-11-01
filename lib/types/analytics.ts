@@ -89,7 +89,6 @@ export type SolarSystemRecord = {
   status: string
 }
 
-export type EnergyStatistics = ReturnType<typeof computeEnergyStatistics>
 
 /** Aggregates consumption records. Returns nulls (never invented numbers) when there is no data. */
 export function computeEnergyStatistics(records: ConsumptionRecord[]) {

@@ -28,6 +28,7 @@ import type { MonthlyClimateInput } from '@/lib/ml/features'
 import { panelTypes } from '@/lib/data/panels'
 import type { SolarProfile } from '@/lib/types/user'
 import { cn } from '@/lib/utils'
+import QuoteChecker from '@/components/billing/QuoteChecker'
 
 type Shading = 'none' | 'partial' | 'heavy'
 type Orientation = 'south' | 'south-east' | 'south-west' | 'east' | 'west'
@@ -480,6 +481,21 @@ export default function SolarAnalysisStudio({ initialProfile }: { initialProfile
             </CardContent>
           </Card>
         </div>
+
+        <Card>
+          <CardHeader>
+            <div>
+              <CardTitle>Check an installer quote</CardTitle>
+              <CardDescription>
+                Upload or type a quote to check its subsidy, panel arithmetic, DCR panels, price per kW, inverter size and fit with
+                your roof and connection. The quote is not stored.
+              </CardDescription>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <QuoteChecker sanctionedLoadKw={sanctioned} recommendedKw={sizing.recommendedCapacityKw} />
+          </CardContent>
+        </Card>
       </div>
     </div>
   )

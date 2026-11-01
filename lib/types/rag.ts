@@ -15,36 +15,7 @@ export type SourceMetadata = {
   version: string | null
 }
 
-export type KnowledgeDocument = {
-  id: string
-  title: string
-  source: string
-  sourceUrl: string
-  organization: string
-  documentType: string
-  locationScope: string
-  publicationDate: string | null
-  effectiveDate: string | null
-  version: string | null
-  contentHash: string
-  status: DocumentStatus
-  createdAt: string
-  updatedAt: string
-}
 
-export type DocumentChunk = {
-  id: string
-  documentId: string
-  chunkIndex: number
-  content: string
-  tokenCount: number
-  pageNumber: number | null
-  sectionTitle: string | null
-  metadata: Record<string, unknown>
-  embedding?: number[]
-  createdAt: string
-  updatedAt: string
-}
 
 export type RetrievalResult = {
   chunkId: string
