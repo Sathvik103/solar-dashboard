@@ -1,479 +1,485 @@
 'use client'
 
-import { useState, useMemo, useEffect } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import Link from 'next/link'
 import {
-  Sun,
-  Zap,
-  IndianRupee,
-  ShieldCheck,
-  TrendingUp,
-  Leaf,
-  Layers,
-  ArrowRight,
-  Sparkles,
-  Sliders,
-  CheckCircle2,
-  } from 'lucide-react'
-import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Line,
+  LineChart,
+  ReferenceLine,
   ResponsiveContainer,
-  AreaChart,
-  Area,
+  Tooltip,
   XAxis,
   YAxis,
-  Tooltip,
-  CartesianGrid,
-  BarChart,
-  Bar,
-  Legend,
 } from 'recharts'
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Input, Select } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
-import { calculateOptimalSystemSize } from '@/lib/calculations/systemSizing'
-import { calculate25YearSavings } from '@/lib/calculations/financial'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { Notice, Stat, StatGrid, fmtInr, fmtNum } from '@/components/layout/Page'
+import AskButton from '@/components/assistant/AskButton'
+import { calculateOptimalSystemSize, monthlyBillSavingInr, SOLAR_COST_PER_KW_INR } from '@/lib/calculations/systemSizing'
+import { calculate25YearSavings, calculatePMSuryaGharSubsidy } from '@/lib/calculations/financial'
 import { runSolarMLInference } from '@/lib/ml/inference'
 import type { MonthlyClimateInput } from '@/lib/ml/features'
-import Link from 'next/link'
+import { panelTypes } from '@/lib/data/panels'
 import type { SolarProfile } from '@/lib/types/user'
+import { cn } from '@/lib/utils'
 
-function toStudioShading(level?: string | null): 'none' | 'partial' | 'heavy' {
+type Shading = 'none' | 'partial' | 'heavy'
+type Orientation = 'south' | 'south-east' | 'south-west' | 'east' | 'west'
+
+function toShading(level?: string | null): Shading {
   if (level === 'heavy' || level === 'high') return 'heavy'
   if (level === 'partial' || level === 'medium' || level === 'low') return 'partial'
   return 'none'
 }
 
-export default function SolarAnalysisStudio({ initialProfile }: { initialProfile?: SolarProfile | null }) {
-  const [monthlyUnits, setMonthlyUnits] = useState(
-    initialProfile?.monthlyUnitsKwh ?? 350
-  )
-  const [monthlyBill, setMonthlyBill] = useState(
-    initialProfile?.monthlyBillInr ?? 2800
-  )
-  const [roofArea, setRoofArea] = useState(
-    initialProfile?.roofAreaSqft ?? 800
-  )
-  const [shading, setShading] = useState<'none' | 'partial' | 'heavy'>(
-    toStudioShading(initialProfile?.shadingLevel)
-  )
-  const [orientation] = useState<'south' | 'east' | 'west'>('south')
-  const usingExampleInputs = initialProfile?.monthlyUnitsKwh == null
-  const [climate, setClimate] = useState<{ place: string; monthly: MonthlyClimateInput[] } | null>(null)
+function toOrientation(o?: string | null): Orientation {
+  return o === 'south-east' || o === 'south-west' || o === 'east' || o === 'west' ? o : 'south'
+}
 
-  // Prefer measured local climatology; the offline reference table is used only if this fails.
+const AXIS = { fontSize: 11, fill: 'var(--muted-foreground)', fontFamily: 'var(--font-plex-mono)' }
+const TOOLTIP = {
+  contentStyle: {
+    background: 'var(--popover)',
+    border: '1px solid var(--border)',
+    borderRadius: 6,
+    fontSize: 12,
+  },
+  labelStyle: { color: 'var(--foreground)', fontWeight: 500 },
+}
+
+function NumberField({
+  id,
+  label,
+  value,
+  onChange,
+  min,
+  max,
+  step = 1,
+  suffix,
+}: {
+  id: string
+  label: string
+  value: number
+  onChange: (n: number) => void
+  min: number
+  max: number
+  step?: number
+  suffix?: string
+}) {
+  return (
+    <div className="flex flex-col gap-1.5">
+      <Label htmlFor={id}>{label}</Label>
+      <div className="relative">
+        <Input
+          id={id}
+          type="number"
+          min={min}
+          max={max}
+          step={step}
+          value={Number.isFinite(value) ? value : ''}
+          onChange={(e) => onChange(Math.min(max, Math.max(0, Number(e.target.value))))}
+          className={suffix ? 'pr-12' : undefined}
+        />
+        {suffix && (
+          <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-[12px] text-muted-foreground">
+            {suffix}
+          </span>
+        )}
+      </div>
+    </div>
+  )
+}
+
+export default function SolarAnalysisStudio({ initialProfile }: { initialProfile?: SolarProfile | null }) {
+  const usingExampleInputs = initialProfile?.monthlyUnitsKwh == null
+  const [monthlyUnits, setMonthlyUnits] = useState(initialProfile?.monthlyUnitsKwh ?? 350)
+  const [roofArea, setRoofArea] = useState(initialProfile?.roofAreaSqft ?? 800)
+  const [shading, setShading] = useState<Shading>(toShading(initialProfile?.shadingLevel))
+  const [orientation, setOrientation] = useState<Orientation>(toOrientation(initialProfile?.roofOrientation))
+  const [capacityOverride, setCapacityOverride] = useState<number | null>(initialProfile?.preferredCapacityKw ?? null)
+  const [escalation, setEscalation] = useState(3)
+  const [climate, setClimate] = useState<{ place: string; monthly: MonthlyClimateInput[] } | null>(null)
+  const [climateState, setClimateState] = useState<'loading' | 'measured' | 'reference'>('loading')
+
+  // Measured local climatology; the built-in reference table is used only if this fails.
   useEffect(() => {
     let cancelled = false
     fetch('/api/climate')
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => {
-        if (!cancelled && d?.monthly?.length === 12) setClimate({ place: d.place, monthly: d.monthly })
+        if (cancelled) return
+        if (d?.monthly?.length === 12) {
+          setClimate({ place: d.place, monthly: d.monthly })
+          setClimateState('measured')
+        } else setClimateState('reference')
       })
-      .catch(() => {})
+      .catch(() => !cancelled && setClimateState('reference'))
     return () => {
       cancelled = true
     }
   }, [])
 
-  // Calculate Deterministic Sizing & Economics
-  const sizing = useMemo(() => {
-    return calculateOptimalSystemSize({
-      monthlyUnitsKwh: monthlyUnits,
-      monthlyBillInr: monthlyBill,
-      roofAreaSqft: roofArea,
-      shadingLevel: shading,
-    })
-  }, [monthlyUnits, monthlyBill, roofArea, shading])
+  const sizing = useMemo(
+    () => calculateOptimalSystemSize({ monthlyUnitsKwh: monthlyUnits, roofAreaSqft: roofArea, shadingLevel: shading }),
+    [monthlyUnits, roofArea, shading]
+  )
+  const capacityKw = capacityOverride && capacityOverride > 0 ? capacityOverride : sizing.recommendedCapacityKw
 
-  // Run ML 12-Month Generation Inference
-  const mlInference = useMemo(() => {
-    return runSolarMLInference({
-      capacityKw: sizing.recommendedCapacityKw,
-      roofAreaSqft: roofArea,
-      orientation,
-      shadingLevel: shading,
-      climate: climate?.monthly,
-    })
-  }, [sizing.recommendedCapacityKw, roofArea, orientation, shading, climate])
+  const yieldCurve = useMemo(
+    () =>
+      runSolarMLInference({
+        capacityKw,
+        roofAreaSqft: roofArea,
+        orientation,
+        shadingLevel: shading,
+        climate: climate?.monthly,
+      }),
+    [capacityKw, roofArea, orientation, shading, climate]
+  )
 
-  // 25-Year Financial Cashflow Projection
-  const financialCashflows = useMemo(() => {
-    return calculate25YearSavings({
-      initialInvestment: sizing.netCostInr,
-      annualSavings: sizing.estimatedAnnualSavingsInr,
+  // Savings month by month against the slab ladder, using the climate-driven yield.
+  const economics = useMemo(() => {
+    const monthly = yieldCurve.monthlyCurve.map((m) => ({
+      month: m.month,
+      generation: m.monthlyKwh,
+      saving: monthlyBillSavingInr(monthlyUnits, m.monthlyKwh),
+    }))
+    const annualSavings = monthly.reduce((a, m) => a + m.saving, 0)
+    const gross = Math.round(capacityKw * SOLAR_COST_PER_KW_INR)
+    const subsidy = calculatePMSuryaGharSubsidy(capacityKw)
+    const net = Math.max(0, gross - subsidy)
+    const projection = calculate25YearSavings({
+      initialInvestment: net,
+      annualSavings,
       degradationRate: 0.005,
-      tariffEscalationRate: 0.03,
-      years: 20,
+      tariffEscalationRate: escalation / 100,
+      years: 25,
     })
-  }, [sizing.netCostInr, sizing.estimatedAnnualSavingsInr])
+    const paybackYear = projection.cashflows.find((c) => c.netCashflowInr >= 0)?.year ?? null
+    const coverage = Math.min(100, Math.round((yieldCurve.predictedAnnualKwh / (monthlyUnits * 12)) * 100))
+    return { monthly, annualSavings, gross, subsidy, net, projection, paybackYear, coverage }
+  }, [yieldCurve, monthlyUnits, capacityKw, escalation])
+
+  const options = useMemo(
+    () =>
+      [2, 3, 4, 5, 7, 10].map((kw) => {
+        const curve = runSolarMLInference({
+          capacityKw: kw,
+          roofAreaSqft: roofArea,
+          orientation,
+          shadingLevel: shading,
+          climate: climate?.monthly,
+        })
+        const annual = curve.monthlyCurve.reduce((a, m) => a + monthlyBillSavingInr(monthlyUnits, m.monthlyKwh), 0)
+        const net = Math.max(0, kw * SOLAR_COST_PER_KW_INR - calculatePMSuryaGharSubsidy(kw))
+        return {
+          kw,
+          annualKwh: curve.predictedAnnualKwh,
+          net,
+          subsidy: calculatePMSuryaGharSubsidy(kw),
+          annual,
+          payback: annual > 0 ? net / annual : null,
+          fits: kw * 90 <= roofArea,
+        }
+      }),
+    [roofArea, orientation, shading, climate, monthlyUnits]
+  )
+
+  const cashflowRows = economics.projection.cashflows.map((c) => ({
+    year: c.year,
+    cumulative: c.cumulativeSavingsInr,
+    investment: economics.net,
+  }))
+  const sanctioned = initialProfile?.sanctionedLoadKw ?? null
 
   return (
-    <div className="space-y-8">
-      {/* Studio Configuration Bar */}
-      <Card className="border-emerald-500/20 bg-gradient-to-r from-emerald-950/20 via-background to-amber-950/10">
-        <CardHeader className="pb-3">
-          <div className="flex items-center justify-between">
-            <div className="space-y-1">
-              <CardTitle className="text-xl flex items-center gap-2">
-                <Sliders className="h-5 w-5 text-emerald-600" />
-                <span>Interactive Solar Studio & Proposal Sizing</span>
-              </CardTitle>
-              <CardDescription>
-                What-if simulator combining deterministic sizing, Telangana tariffs, PM Surya Ghar subsidies and a physics-based yield estimate. Inputs start from your profile; edit them to explore scenarios.
-              </CardDescription>
-              {usingExampleInputs && (
-                <p role="note" className="text-xs text-amber-600 font-medium">
-                  Showing example inputs (350 kWh/month, ₹2,800 bill, 800 sq ft) because your profile has no
-                  consumption yet. <Link href="/profile" className="underline">Add your details</Link> for a personal
-                  proposal.
-                </p>
-              )}
-            </div>
-            <Badge className="bg-emerald-600 font-mono text-xs">
-              {climate ? `Measured climate: ${climate.place}` : 'Reference climate (offline)'}
-            </Badge>
+    <div className="grid gap-6 lg:grid-cols-[300px_1fr] lg:items-start">
+      <Card className="lg:sticky lg:top-6">
+        <CardHeader>
+          <div>
+            <CardTitle>Inputs</CardTitle>
+            <CardDescription>Starts from your profile. Changes here are not saved.</CardDescription>
           </div>
         </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="space-y-2">
-              <Label className="text-xs font-semibold">Monthly Consumption (kWh)</Label>
-              <Input
-                type="number"
-                min={50}
-                max={2500}
-                value={monthlyUnits}
-                onChange={(e) => setMonthlyUnits(Number(e.target.value))}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label className="text-xs font-semibold">Monthly Bill (₹)</Label>
-              <Input
-                type="number"
-                min={200}
-                max={50000}
-                value={monthlyBill}
-                onChange={(e) => setMonthlyBill(Number(e.target.value))}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label className="text-xs font-semibold">Available Roof Area (sq.ft)</Label>
-              <Input
-                type="number"
-                min={100}
-                max={10000}
-                value={roofArea}
-                onChange={(e) => setRoofArea(Number(e.target.value))}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label className="text-xs font-semibold">Roof Shading Condition</Label>
-              <select
-                className="w-full h-9 rounded-md border bg-background px-3 text-xs"
-                value={shading}
-                onChange={(e) => setShading(e.target.value as 'none' | 'partial' | 'heavy')}
-              >
-                <option value="none">Zero Shadow (Full Sun)</option>
-                <option value="partial">Partial Shading (~15% loss)</option>
-                <option value="heavy">Heavy Shading (~30% loss)</option>
-              </select>
-            </div>
+        <CardContent className="space-y-4">
+          <NumberField id="units" label="Monthly consumption" value={monthlyUnits} onChange={setMonthlyUnits} min={20} max={5000} suffix="kWh" />
+          <NumberField id="roof" label="Shade-free roof area" value={roofArea} onChange={setRoofArea} min={50} max={10000} suffix="sq ft" />
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="shading">Shading</Label>
+            <Select id="shading" value={shading} onChange={(e) => setShading(e.target.value as Shading)}>
+              <option value="none">None</option>
+              <option value="partial">Partial, about 15% loss</option>
+              <option value="heavy">Heavy, about 30% loss</option>
+            </Select>
           </div>
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="orientation">Roof faces</Label>
+            <Select id="orientation" value={orientation} onChange={(e) => setOrientation(e.target.value as Orientation)}>
+              <option value="south">South</option>
+              <option value="south-east">South-east</option>
+              <option value="south-west">South-west</option>
+              <option value="east">East</option>
+              <option value="west">West</option>
+            </Select>
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="capacity">System size</Label>
+            <Select
+              id="capacity"
+              value={capacityOverride ?? ''}
+              onChange={(e) => setCapacityOverride(e.target.value ? Number(e.target.value) : null)}
+            >
+              <option value="">Recommended ({sizing.recommendedCapacityKw} kW)</option>
+              {[1, 2, 3, 4, 5, 6, 7, 8, 10].map((kw) => (
+                <option key={kw} value={kw}>
+                  {kw} kW
+                </option>
+              ))}
+            </Select>
+          </div>
+          <NumberField id="esc" label="Tariff growth per year" value={escalation} onChange={setEscalation} min={0} max={10} step={0.5} suffix="%" />
+          <p className="border-t pt-3 text-[12px] text-muted-foreground">
+            Climate:{' '}
+            {climateState === 'loading'
+              ? 'loading'
+              : climateState === 'measured'
+                ? `measured 10-year mean, ${climate?.place}`
+                : 'reference table (live data unavailable)'}
+            . Installed cost ₹{fmtNum(SOLAR_COST_PER_KW_INR)}/kW is a market estimate.
+          </p>
         </CardContent>
       </Card>
 
-      {/* KPI Highlight Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="hover:border-emerald-500/40 transition-colors">
-          <CardContent className="p-6 flex items-center justify-between">
-            <div className="space-y-1">
-              <span className="text-xs text-muted-foreground font-medium">Recommended System</span>
-              <div className="text-2xl font-black text-foreground">
-                {sizing.recommendedCapacityKw} <span className="text-sm font-normal text-muted-foreground">kW</span>
-              </div>
-              <span className="text-xs text-emerald-600 font-medium">
-                Offsets ~{sizing.coveragePercentage}% of bill
-              </span>
-            </div>
-            <div className="h-12 w-12 rounded-xl bg-emerald-100 dark:bg-emerald-950 text-emerald-600 flex items-center justify-center">
-              <Sun className="h-6 w-6" />
-            </div>
-          </CardContent>
-        </Card>
+      <div className="min-w-0 space-y-6">
+        {usingExampleInputs && (
+          <Notice>
+            These are example inputs because your profile has no consumption yet.{' '}
+            <Link href="/profile" className="text-primary underline underline-offset-2">
+              Add your details
+            </Link>{' '}
+            for a personal proposal.
+          </Notice>
+        )}
 
-        <Card className="hover:border-amber-500/40 transition-colors">
-          <CardContent className="p-6 flex items-center justify-between">
-            <div className="space-y-1">
-              <span className="text-xs text-muted-foreground font-medium">Net Investment</span>
-              <div className="text-2xl font-black text-foreground">
-                ₹{sizing.netCostInr.toLocaleString()}
-              </div>
-              <span className="text-xs text-amber-600 font-medium">
-                Includes ₹{sizing.subsidyAmountInr.toLocaleString()} PM Surya Ghar Subsidy
-              </span>
-            </div>
-            <div className="h-12 w-12 rounded-xl bg-amber-100 dark:bg-amber-950 text-amber-600 flex items-center justify-center">
-              <IndianRupee className="h-6 w-6" />
-            </div>
-          </CardContent>
-        </Card>
+        <StatGrid>
+          <Stat label="System" value={fmtNum(capacityKw, 1)} unit="kW" note={`Covers ${economics.coverage}% of annual use`} />
+          <Stat label="Net cost" value={fmtInr(economics.net)} note={`After ${fmtInr(economics.subsidy)} subsidy`} />
+          <Stat label="First-year saving" value={fmtInr(economics.annualSavings)} tone="positive" note={`${fmtInr(economics.annualSavings / 12)} a month on average`} />
+          <Stat
+            label="Payback"
+            value={economics.paybackYear != null ? economics.paybackYear : '—'}
+            unit={economics.paybackYear != null ? 'years' : undefined}
+            note={`25-year net ${fmtInr(economics.projection.netProfit)}`}
+          />
+        </StatGrid>
 
-        <Card className="hover:border-emerald-500/40 transition-colors">
-          <CardContent className="p-6 flex items-center justify-between">
-            <div className="space-y-1">
-              <span className="text-xs text-muted-foreground font-medium">Estimated Annual Savings</span>
-              <div className="text-2xl font-black text-emerald-600 dark:text-emerald-400">
-                ₹{sizing.estimatedAnnualSavingsInr.toLocaleString()}
+        <div className="grid gap-6 xl:grid-cols-2">
+          <Card>
+            <CardHeader>
+              <div>
+                <CardTitle>Monthly generation</CardTitle>
+                <CardDescription>Monsoon months produce least; spring the most.</CardDescription>
               </div>
-              <span className="text-xs text-muted-foreground">
-                ~₹{sizing.estimatedMonthlySavingsInr.toLocaleString()} / month
-              </span>
-            </div>
-            <div className="h-12 w-12 rounded-xl bg-emerald-100 dark:bg-emerald-950 text-emerald-600 flex items-center justify-center">
-              <TrendingUp className="h-6 w-6" />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="hover:border-emerald-500/40 transition-colors">
-          <CardContent className="p-6 flex items-center justify-between">
-            <div className="space-y-1">
-              <span className="text-xs text-muted-foreground font-medium">Payback Period</span>
-              <div className="text-2xl font-black text-foreground">
-                {sizing.paybackPeriodYears} <span className="text-sm font-normal text-muted-foreground">years</span>
+              <span className="num text-[13px] text-muted-foreground">{fmtNum(yieldCurve.predictedAnnualKwh)} kWh/yr</span>
+            </CardHeader>
+            <CardContent>
+              <div className="h-[220px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={economics.monthly} margin={{ top: 8, right: 4, bottom: 0, left: -12 }}>
+                    <CartesianGrid vertical={false} stroke="var(--border)" />
+                    <XAxis dataKey="month" tick={AXIS} tickLine={false} axisLine={false} />
+                    <YAxis tick={AXIS} tickLine={false} axisLine={false} width={44} />
+                    <ReferenceLine y={monthlyUnits} stroke="var(--chart-2)" strokeDasharray="4 3" />
+                    <Tooltip {...TOOLTIP} cursor={{ fill: 'var(--muted)' }} formatter={(v) => [`${v} kWh`, 'Generation']} />
+                    <Bar dataKey="generation" fill="var(--chart-1)" radius={[2, 2, 0, 0]} maxBarSize={22} isAnimationActive={false} />
+                  </BarChart>
+                </ResponsiveContainer>
               </div>
-              <span className="text-xs text-emerald-600 font-medium">
-                25-Yr Net Profit: ₹{financialCashflows.netProfit.toLocaleString()}
-              </span>
-            </div>
-            <div className="h-12 w-12 rounded-xl bg-emerald-100 dark:bg-emerald-950 text-emerald-600 flex items-center justify-center">
-              <Zap className="h-6 w-6" />
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+              <p className="mt-2 text-[12px] text-muted-foreground">
+                Dashed line: your monthly consumption. Capacity factor {yieldCurve.capacityUtilizationFactorPercent}%.
+              </p>
+            </CardContent>
+          </Card>
 
-      {/* Main Charts Row */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* ML 12-Month Generation Curve */}
+          <Card>
+            <CardHeader>
+              <div>
+                <CardTitle>25-year cumulative savings</CardTitle>
+                <CardDescription>0.5% yearly module degradation, {escalation}% tariff growth.</CardDescription>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="h-[220px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={cashflowRows} margin={{ top: 8, right: 4, bottom: 0, left: -4 }}>
+                    <CartesianGrid vertical={false} stroke="var(--border)" />
+                    <XAxis dataKey="year" tick={AXIS} tickLine={false} axisLine={false} />
+                    <YAxis
+                      tick={AXIS}
+                      tickLine={false}
+                      axisLine={false}
+                      width={52}
+                      tickFormatter={(v: number) => (v >= 100000 ? `${(v / 100000).toFixed(1)}L` : `${Math.round(v / 1000)}k`)}
+                    />
+                    <Tooltip {...TOOLTIP} labelFormatter={(y) => `Year ${y}`} formatter={(v) => fmtInr(Number(v))} />
+                    <Line dataKey="cumulative" name="Cumulative savings" stroke="var(--chart-1)" strokeWidth={1.75} dot={false} isAnimationActive={false} />
+                    <Line dataKey="investment" name="Net cost" stroke="var(--chart-2)" strokeDasharray="4 3" strokeWidth={1.5} dot={false} isAnimationActive={false} />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+              <p className="mt-2 text-[12px] text-muted-foreground">
+                Lifetime savings {fmtInr(economics.projection.totalSavings)}; break-even where the lines cross.
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+
         <Card>
           <CardHeader>
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle className="text-base flex items-center gap-2">
-                  <Sun className="h-4 w-4 text-amber-500" />
-                  <span>ML Predicted Monthly Generation Curve</span>
-                </CardTitle>
-                <CardDescription className="text-xs">
-                  Predicted monthly energy yield (kWh) accounting for seasonal cloud cover and monsoon dips.
-                </CardDescription>
-              </div>
-              <Badge variant="outline" className="text-xs font-mono">
-                Annual: {mlInference.predictedAnnualKwh} kWh
-              </Badge>
+            <div>
+              <CardTitle>Size options</CardTitle>
+              <CardDescription>Each size modelled with your climate, roof and consumption.</CardDescription>
             </div>
           </CardHeader>
-          <CardContent>
-            <div className="h-[280px] w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={mlInference.monthlyCurve}>
-                  <defs>
-                    <linearGradient id="solarYieldGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#10b981" stopOpacity={0.4} />
-                      <stop offset="95%" stopColor="#10b981" stopOpacity={0.0} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" opacity={0.15} />
-                  <XAxis dataKey="month" tick={{ fontSize: 11 }} />
-                  <YAxis unit=" kWh" tick={{ fontSize: 11 }} />
-                  <Tooltip />
-                  <Area
-                    type="monotone"
-                    dataKey="monthlyKwh"
-                    name="Predicted Generation"
-                    stroke="#10b981"
-                    strokeWidth={2}
-                    fillOpacity={1}
-                    fill="url(#solarYieldGrad)"
-                  />
-                </AreaChart>
-              </ResponsiveContainer>
-            </div>
-            <div className="flex items-center justify-between text-xs text-muted-foreground pt-3 border-t">
-              <span>Peak Month: <strong className="text-foreground">{mlInference.peakProductionMonth}</strong></span>
-              <span>Monsoon Low: <strong className="text-foreground">{mlInference.lowestProductionMonth}</strong></span>
-              <span>Capacity Utilization: <strong className="text-foreground">{mlInference.capacityUtilizationFactorPercent}%</strong></span>
-            </div>
-          </CardContent>
+          <Table>
+            <TableHeader>
+              <TableRow className="hover:bg-transparent">
+                <TableHead>Size</TableHead>
+                <TableHead className="text-right">Generation / yr</TableHead>
+                <TableHead className="text-right">Subsidy</TableHead>
+                <TableHead className="text-right">Net cost</TableHead>
+                <TableHead className="text-right">Saving / yr</TableHead>
+                <TableHead className="text-right">Payback</TableHead>
+                <TableHead />
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {options.map((o) => (
+                <TableRow key={o.kw} className={cn(o.kw === capacityKw && 'bg-accent/50')}>
+                  <TableCell className="num">
+                    {o.kw} kW
+                    {o.kw === sizing.recommendedCapacityKw && <Badge className="ml-2">Recommended</Badge>}
+                    {!o.fits && (
+                      <Badge variant="warning" className="ml-2">
+                        Roof too small
+                      </Badge>
+                    )}
+                  </TableCell>
+                  <TableCell className="num text-right">{fmtNum(o.annualKwh)} kWh</TableCell>
+                  <TableCell className="num text-right">{fmtInr(o.subsidy)}</TableCell>
+                  <TableCell className="num text-right">{fmtInr(o.net)}</TableCell>
+                  <TableCell className="num text-right">{fmtInr(o.annual)}</TableCell>
+                  <TableCell className="num text-right">{o.payback != null ? `${fmtNum(o.payback, 1)} yrs` : '—'}</TableCell>
+                  <TableCell className="text-right">
+                    <AskButton
+                      question={`Is a ${o.kw} kW system right for me at ${monthlyUnits} kWh a month?`}
+                      variant="ghost"
+                      size="xs"
+                      icon={false}
+                    >
+                      Ask
+                    </AskButton>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
         </Card>
 
-        {/* 20-Year Cumulative Cashflow Chart */}
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
+        <div className="grid gap-6 xl:grid-cols-2">
+          <Card>
+            <CardHeader>
               <div>
-                <CardTitle className="text-base flex items-center gap-2">
-                  <TrendingUp className="h-4 w-4 text-emerald-600" />
-                  <span>20-Year Net Financial Return</span>
-                </CardTitle>
-                <CardDescription className="text-xs">
-                  Cumulative savings considering 0.5% module degradation & 3% annual tariff escalation.
-                </CardDescription>
+                <CardTitle>Panel technology</CardTitle>
+                <CardDescription>Modules needed for {fmtNum(capacityKw, 1)} kW. Prices are typical retail.</CardDescription>
               </div>
-              <Badge variant="outline" className="text-xs font-mono text-emerald-600">
-                ROI: {sizing.paybackPeriodYears} yrs
-              </Badge>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="h-[280px] w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={financialCashflows.cashflows.filter((_, idx) => idx % 2 === 0)}>
-                  <CartesianGrid strokeDasharray="3 3" opacity={0.15} />
-                  <XAxis dataKey="year" tickFormatter={(y) => `Yr ${y}`} tick={{ fontSize: 11 }} />
-                  <YAxis tickFormatter={(val) => `₹${(val / 1000).toFixed(0)}k`} tick={{ fontSize: 11 }} />
-                  <Tooltip formatter={(val) => `₹${Number(val).toLocaleString()}`} />
-                  <Legend />
-                  <Bar dataKey="cumulativeSavingsInr" name="Cumulative Savings" fill="#10b981" radius={[4, 4, 0, 0]} />
-                  <Bar dataKey="netCashflowInr" name="Net Profit" fill="#f59e0b" radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-            <div className="flex items-center justify-between text-xs text-muted-foreground pt-3 border-t">
-              <span>Lifetime Savings: <strong className="text-foreground">₹{financialCashflows.totalSavings.toLocaleString()}</strong></span>
-              <span>Net Profit: <strong className="text-foreground">₹{financialCashflows.netProfit.toLocaleString()}</strong></span>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* System Capacity Comparison Table */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base flex items-center gap-2">
-            <Layers className="h-4 w-4 text-amber-500" />
-            <span>Capacity Options Comparison (Telangana Benchmarks)</span>
-          </CardTitle>
-          <CardDescription className="text-xs">
-            Standard residential system configurations compared against your monthly usage ({monthlyUnits} kWh).
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="overflow-x-auto">
-            <table className="w-full text-xs">
-              <thead>
-                <tr className="border-b text-muted-foreground">
-                  <th className="text-left py-2.5 px-3">System Size</th>
-                  <th className="text-left py-2.5 px-3">Monthly Yield</th>
-                  <th className="text-left py-2.5 px-3">Gross Cost</th>
-                  <th className="text-left py-2.5 px-3">Govt Subsidy</th>
-                  <th className="text-left py-2.5 px-3">Net Cost</th>
-                  <th className="text-left py-2.5 px-3">Monthly Savings</th>
-                  <th className="text-left py-2.5 px-3">Payback</th>
-                  <th className="text-right py-2.5 px-3">Status</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y">
-                {sizing.comparisonOptions.map((opt) => {
-                  const isRec = opt.capacityKw === sizing.recommendedCapacityKw
+            </CardHeader>
+            <Table>
+              <TableHeader>
+                <TableRow className="hover:bg-transparent">
+                  <TableHead>Type</TableHead>
+                  <TableHead className="text-right">Panels</TableHead>
+                  <TableHead className="text-right">Area</TableHead>
+                  <TableHead className="text-right">Degradation</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {panelTypes.map((p) => {
+                  const count = Math.ceil((capacityKw * 1000) / p.wattage)
+                  const areaSqft = Math.round(((count * p.wattage) / (p.efficiency * 1000)) * 10.764)
                   return (
-                    <tr key={opt.capacityKw} className={`hover:bg-muted/40 ${isRec ? 'bg-emerald-500/5 font-semibold' : ''}`}>
-                      <td className="py-3 px-3 flex items-center gap-2">
-                        <span>{opt.capacityKw} kW</span>
-                        {isRec && <Badge className="text-[10px] h-4 bg-emerald-600">Recommended</Badge>}
-                      </td>
-                      <td className="py-3 px-3">{opt.monthlyGenKwh} kWh</td>
-                      <td className="py-3 px-3">₹{opt.grossCostInr.toLocaleString()}</td>
-                      <td className="py-3 px-3 text-emerald-600 font-medium">₹{opt.subsidyInr.toLocaleString()}</td>
-                      <td className="py-3 px-3 font-bold">₹{opt.netCostInr.toLocaleString()}</td>
-                      <td className="py-3 px-3">₹{opt.monthlySavingsInr.toLocaleString()}</td>
-                      <td className="py-3 px-3">{opt.paybackYears} yrs</td>
-                      <td className="py-3 px-3 text-right">
-                        <Link href={`/chat?q=Why+is+the+${opt.capacityKw}kW+system+suitable+for+me`}>
-                          <Button size="sm" variant="ghost" className="h-7 text-xs gap-1">
-                            <span>Ask Agent</span>
-                            <ArrowRight className="h-3 w-3" />
-                          </Button>
-                        </Link>
-                      </td>
-                    </tr>
+                    <TableRow key={p.name}>
+                      <TableCell>
+                        {p.name}
+                        <span className="num ml-1.5 text-[12px] text-muted-foreground">{p.wattage} W</span>
+                      </TableCell>
+                      <TableCell className="num text-right">{count}</TableCell>
+                      <TableCell className={cn('num text-right', areaSqft > roofArea && 'text-warning')}>{fmtNum(areaSqft)} sq ft</TableCell>
+                      <TableCell className="num text-right">{fmtNum(p.degradationRate * 100, 1)}%/yr</TableCell>
+                    </TableRow>
                   )
                 })}
-              </tbody>
-            </table>
-          </div>
-        </CardContent>
-      </Card>
+              </TableBody>
+            </Table>
+          </Card>
 
-      {/* Environmental & Regulatory Checklist */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base flex items-center gap-2">
-              <Leaf className="h-4 w-4 text-emerald-600" />
-              <span>Environmental & Carbon Impact</span>
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4 text-xs">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="p-4 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 space-y-1">
-                <span className="text-muted-foreground">Annual CO2 Reduction</span>
-                <div className="text-xl font-bold text-emerald-700 dark:text-emerald-300">
-                  {sizing.annualCo2AvoidedKg.toLocaleString()} kg
-                </div>
-                <span className="text-[11px] text-muted-foreground">~{(sizing.annualCo2AvoidedKg / 1000).toFixed(1)} tonnes/year</span>
+          <Card>
+            <CardHeader>
+              <CardTitle>Feasibility</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ul className="divide-y text-[13px]">
+                {[
+                  {
+                    ok: capacityKw * 90 <= roofArea,
+                    label: 'Roof area',
+                    detail: `${fmtNum(capacityKw * 90)} of ${fmtNum(roofArea)} sq ft needed`,
+                  },
+                  {
+                    ok: sanctioned == null ? null : capacityKw <= sanctioned,
+                    label: 'Sanctioned load',
+                    detail:
+                      sanctioned == null
+                        ? 'Add it in Settings to check'
+                        : capacityKw <= sanctioned
+                          ? `Within ${fmtNum(sanctioned, 1)} kW`
+                          : `Above ${fmtNum(sanctioned, 1)} kW; apply for load enhancement`,
+                  },
+                  {
+                    ok: true,
+                    label: 'PM Surya Ghar',
+                    detail: `${fmtInr(economics.subsidy)} for ${fmtNum(capacityKw, 1)} kW, paid after commissioning`,
+                  },
+                ].map((row) => (
+                  <li key={row.label} className="flex items-start justify-between gap-4 py-2.5 first:pt-0">
+                    <span className="flex items-center gap-2">
+                      <span
+                        aria-hidden
+                        className={cn(
+                          'size-2 rounded-[2px]',
+                          row.ok == null ? 'bg-muted-foreground/40' : row.ok ? 'bg-positive' : 'bg-warning'
+                        )}
+                      />
+                      {row.label}
+                    </span>
+                    <span className="text-right text-muted-foreground">{row.detail}</span>
+                  </li>
+                ))}
+              </ul>
+              <div className="mt-4">
+                <AskButton question={`What are the steps to install a ${fmtNum(capacityKw, 1)} kW rooftop system with TSSPDCL net metering?`}>
+                  Ask for the application steps
+                </AskButton>
               </div>
-              <div className="p-4 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 space-y-1">
-                <span className="text-muted-foreground">Equivalent Trees Planted</span>
-                <div className="text-xl font-bold text-emerald-700 dark:text-emerald-300">
-                  {sizing.treesEquivalentPlanted} trees
-                </div>
-                <span className="text-[11px] text-muted-foreground">Lifetime CO2 offset equivalent</span>
-              </div>
-            </div>
-            <p className="text-muted-foreground text-xs leading-relaxed">
-              Replacing coal-heavy grid electricity with clean solar power from your rooftop significantly offsets greenhouse gas emissions and qualifies for green building credits in Telangana.
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base flex items-center gap-2">
-              <ShieldCheck className="h-4 w-4 text-amber-600" />
-              <span>Telangana Feasibility & DISCOM Checklist</span>
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2 text-xs">
-            <div className="flex items-start gap-2 p-2.5 rounded-lg bg-muted/40">
-              <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0 mt-0.5" />
-              <div>
-                <strong className="text-foreground">Roof Area Compliance:</strong> {sizing.requiredRoofAreaSqft} sq.ft required out of {roofArea} sq.ft ({sizing.isRoofSufficient ? 'Sufficient' : 'Tight roof space'}).
-              </div>
-            </div>
-            <div className="flex items-start gap-2 p-2.5 rounded-lg bg-muted/40">
-              <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0 mt-0.5" />
-              <div>
-                <strong className="text-foreground">TGERC Net-metering:</strong> Eligible under Regulation 1 of 2016 (Residential ≤ 1000 kW).
-              </div>
-            </div>
-            <div className="flex items-start gap-2 p-2.5 rounded-lg bg-muted/40">
-              <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0 mt-0.5" />
-              <div>
-                <strong className="text-foreground">PM Surya Ghar Subsidy:</strong> Direct Benefit Transfer of ₹{sizing.subsidyAmountInr.toLocaleString()} into bank account within 30 days of commissioning.
-              </div>
-            </div>
-
-            <div className="pt-2">
-              <Link href={`/chat?q=How+do+I+apply+for+a+${sizing.recommendedCapacityKw}kW+system+in+Hyderabad`}>
-                <Button className="w-full bg-emerald-600 hover:bg-emerald-700 text-white gap-2">
-                  <Sparkles className="h-4 w-4" />
-                  <span>Generate Detailed Implementation Roadmap with Agent</span>
-                </Button>
-              </Link>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        </div>
       </div>
     </div>
   )

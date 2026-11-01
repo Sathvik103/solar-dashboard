@@ -19,8 +19,15 @@ export type GenerateOptions = {
   model?: string
 }
 
-const DEFAULT_MODEL = 'gemini-2.5-flash'
-const FALLBACK_MODEL = 'gemini-1.5-flash'
+/**
+ * Model chain, tried in order. Override the first with GEMINI_MODEL. gemini-2.5/1.5 IDs are retired
+ * for new API keys (HTTP 404), so they must not be used here.
+ */
+const MODEL_CHAIN = [process.env.GEMINI_MODEL, 'gemini-3.5-flash', 'gemini-3.1-flash-lite'].filter(
+  (m, i, all): m is string => !!m && all.indexOf(m) === i
+)
+/** Per-attempt timeout; a slow primary falls through to the next model. */
+const ATTEMPT_TIMEOUT_MS = 25_000
 
 /**
  * Executes a text generation request with Gemini.
@@ -38,7 +45,7 @@ export async function generateLLMResponse(
 
   const ai = new GoogleGenAI({ apiKey })
   const systemInstruction = options.systemPrompt
-  const modelName = options.model || DEFAULT_MODEL
+  const models = options.model ? [options.model] : MODEL_CHAIN
 
   // Format contents for Gemini API
   const contents = messages
@@ -48,41 +55,28 @@ export async function generateLLMResponse(
       parts: [{ text: m.content }],
     }))
 
-  try {
-    const response = await ai.models.generateContent({
-      model: modelName,
-      contents,
-      config: {
-        systemInstruction: systemInstruction ? { parts: [{ text: systemInstruction }] } : undefined,
-        temperature: options.temperature ?? 0.2,
-        maxOutputTokens: options.maxTokens ?? 2048,
-      },
-    })
-
-    const text = response.text
-    if (!text) {
-      throw new Error('Gemini API returned an empty response text')
+  const failures: string[] = []
+  for (const model of models) {
+    try {
+      const response = await ai.models.generateContent({
+        model,
+        contents,
+        config: {
+          systemInstruction: systemInstruction ? { parts: [{ text: systemInstruction }] } : undefined,
+          temperature: options.temperature ?? 0.2,
+          // Thinking models spend part of the budget on reasoning tokens.
+          maxOutputTokens: options.maxTokens ?? 8192,
+          abortSignal: AbortSignal.timeout(ATTEMPT_TIMEOUT_MS),
+        },
+      })
+      const text = response.text
+      if (text) return text
+      failures.push(`${model}: empty response (${response.candidates?.[0]?.finishReason ?? 'unknown'})`)
+    } catch (error) {
+      failures.push(`${model}: ${errorMessage(error)}`)
     }
-    return text
-  } catch (error) {
-    if (modelName !== FALLBACK_MODEL) {
-      // Retry once with fallback model
-      try {
-        const fallbackRes = await ai.models.generateContent({
-          model: FALLBACK_MODEL,
-          contents,
-          config: {
-            systemInstruction: systemInstruction ? { parts: [{ text: systemInstruction }] } : undefined,
-            temperature: options.temperature ?? 0.2,
-          },
-        })
-        if (fallbackRes.text) return fallbackRes.text
-      } catch (fallbackErr) {
-        throw new Error(`Gemini LLM generation failed: ${errorMessage(fallbackErr) || errorMessage(error)}`)
-      }
-    }
-    throw new Error(`Gemini LLM generation failed: ${errorMessage(error) || error}`)
   }
+  throw new Error(`Gemini LLM generation failed: ${failures.join(' | ')}`)
 }
 
 /**
@@ -99,7 +93,7 @@ export async function* streamLLMResponse(
 
   const ai = new GoogleGenAI({ apiKey })
   const systemInstruction = options.systemPrompt
-  const modelName = options.model || DEFAULT_MODEL
+  const modelName = options.model || MODEL_CHAIN[0]
 
   const contents = messages
     .filter((m) => m.role !== 'system')
@@ -115,7 +109,7 @@ export async function* streamLLMResponse(
       config: {
         systemInstruction: systemInstruction ? { parts: [{ text: systemInstruction }] } : undefined,
         temperature: options.temperature ?? 0.2,
-        maxOutputTokens: options.maxTokens ?? 2048,
+        maxOutputTokens: options.maxTokens ?? 8192,
       },
     })
 

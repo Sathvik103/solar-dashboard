@@ -34,7 +34,7 @@ export default function LoginForm() {
           disabled={isPending}
         />
         {state?.errors?.email && (
-          <p className="text-xs text-destructive">{state.errors.email[0]}</p>
+          <p className="text-[12px] text-destructive">{state.errors.email[0]}</p>
         )}
       </div>
 
@@ -51,7 +51,7 @@ export default function LoginForm() {
           disabled={isPending}
         />
         {state?.errors?.password && (
-          <p className="text-xs text-destructive">{state.errors.password[0]}</p>
+          <p className="text-[12px] text-destructive">{state.errors.password[0]}</p>
         )}
       </div>
 
@@ -59,7 +59,7 @@ export default function LoginForm() {
         {isPending ? 'Signing in...' : 'Sign in'}
       </Button>
 
-      <p className="text-center text-sm text-muted-foreground mt-4">
+      <p className="text-center text-[13px] text-muted-foreground">
         Don&apos;t have an account?{' '}
         <Link href="/signup" className="text-primary hover:underline font-medium">
           Sign up

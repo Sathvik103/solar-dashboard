@@ -36,7 +36,7 @@ export function verifyAgentResponse(
     )
     if (hasRegulatoryKeywords) {
       const disclaimerNotice =
-        '\n\n> ⚠️ **Verification Notice:** Specific official policy documents could not be verified in the immediate knowledge retrieval. Please confirm final rates and eligibility with TSSPDCL or TGREDCO before application.'
+        '\n\n> **Verification notice:** Specific official policy documents could not be verified in the immediate knowledge retrieval. Please confirm final rates and eligibility with TSSPDCL or TGREDCO before application.'
       if (!verifiedAnswer.includes('Verification Notice')) {
         verifiedAnswer += disclaimerNotice
         disclaimersAdded.push('Regulatory verification disclaimer')

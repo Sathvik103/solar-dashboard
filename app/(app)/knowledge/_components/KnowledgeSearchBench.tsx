@@ -1,19 +1,14 @@
 'use client'
 
 import { useState } from 'react'
-import {
-  Search,
-  ExternalLink,
-  BookOpen,
-  AlertCircle,
-  BarChart3,
-  Sparkles,
-  } from 'lucide-react'
+import { ExternalLink, Search } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
+import { Input, Select } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { EmptyState, fmtNum } from '@/components/layout/Page'
+import AskButton from '@/components/assistant/AskButton'
 import { TELANGANA_EVALUATION_QUERIES } from '@/lib/rag/evaluationQueries'
 import type { RetrievalResult } from '@/lib/types/rag'
 import { errorMessage } from '@/lib/utils'
@@ -29,343 +24,210 @@ type EvalResponse = {
   }
 }
 
+const ORGS = ['TGERC', 'TGREDCO', 'TSSPDCL', 'MNRE']
+
 export default function KnowledgeSearchBench() {
   const [query, setQuery] = useState('')
+  const [lastQuery, setLastQuery] = useState('')
   const [topK, setTopK] = useState(5)
-  const [threshold, setThreshold] = useState(0.25)
-  const [orgFilter, setOrgFilter] = useState<string>('')
+  const [orgFilter, setOrgFilter] = useState('')
   const [loading, setLoading] = useState(false)
   const [results, setResults] = useState<RetrievalResult[] | null>(null)
   const [error, setError] = useState<string | null>(null)
-
-  // Evaluation benchmark state
   const [evalLoading, setEvalLoading] = useState(false)
   const [evalData, setEvalData] = useState<EvalResponse | null>(null)
+  const [evalError, setEvalError] = useState<string | null>(null)
 
-  async function handleSearch(searchQuery?: string) {
-    const q = searchQuery || query
-    if (!q || q.trim().length < 3) return
-
+  async function search(q = query) {
+    const text = q.trim()
+    if (text.length < 3) return
+    setQuery(text)
+    setLastQuery(text)
     setLoading(true)
     setError(null)
-    setResults(null)
-
     try {
       const res = await fetch('/api/knowledge/search', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          query: q,
-          topK,
-          similarityThreshold: threshold,
-          organization: orgFilter || undefined,
-        }),
+        body: JSON.stringify({ query: text, topK, similarityThreshold: 0.25, organization: orgFilter || undefined }),
       })
-
       const data = await res.json()
-      if (!res.ok) {
-        throw new Error(data.error || 'Failed to execute knowledge search')
-      }
+      if (!res.ok) throw new Error(data.error || 'Search failed')
       setResults(data.results || [])
     } catch (err) {
-      setError(errorMessage(err) || 'An unexpected error occurred')
+      setError(errorMessage(err, 'Search failed'))
+      setResults(null)
     } finally {
       setLoading(false)
     }
   }
 
-  async function handleRunEvaluation() {
+  async function runEvaluation() {
     setEvalLoading(true)
+    setEvalError(null)
     try {
       const res = await fetch('/api/eval')
       const data = await res.json()
-      if (res.ok) {
-        setEvalData(data)
-      }
-    } catch {
-      // Handle eval error
+      if (!res.ok) throw new Error(data.error || 'Evaluation failed')
+      setEvalData(data)
+    } catch (err) {
+      setEvalError(errorMessage(err, 'Evaluation failed'))
     } finally {
       setEvalLoading(false)
     }
   }
 
+  const r = evalData?.ragEvaluation
+
   return (
-    <div className="flex flex-col gap-6">
-      {/* Benchmark Summary Bar */}
-      <Card className="border-amber-500/20 bg-amber-500/5">
-        <CardContent className="p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className="h-9 w-9 rounded-lg bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300 flex items-center justify-center">
-              <BarChart3 className="h-5 w-5" />
-            </div>
-            <div>
-              <div className="font-bold text-sm">RAG & ML Evaluation Benchmark Suite</div>
-              <p className="text-xs text-muted-foreground">
-                30 verified Telangana queries • Dense pgvector similarity • ML regression validation
-              </p>
-            </div>
+    <div className="grid gap-6 lg:grid-cols-[1fr_300px] lg:items-start">
+      <div className="min-w-0 space-y-4">
+        <form
+          onSubmit={(e) => {
+            e.preventDefault()
+            void search()
+          }}
+          className="flex flex-col gap-3 sm:flex-row sm:items-end"
+        >
+          <div className="relative flex-1">
+            <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="e.g. capacity limit for net metering"
+              aria-label="Search the regulations"
+              className="h-10 pl-9"
+            />
           </div>
-          <Button
-            size="sm"
-            onClick={handleRunEvaluation}
-            disabled={evalLoading}
-            className="text-xs gap-1.5 bg-amber-600 hover:bg-amber-700 text-white shrink-0"
-          >
-            <Sparkles className="h-3.5 w-3.5" />
-            <span>{evalLoading ? 'Evaluating 30 queries...' : 'Run Benchmark Evaluation'}</span>
+          <Select aria-label="Organisation" value={orgFilter} onChange={(e) => setOrgFilter(e.target.value)} className="h-10 sm:w-40">
+            <option value="">All sources</option>
+            {ORGS.map((o) => (
+              <option key={o} value={o}>
+                {o}
+              </option>
+            ))}
+          </Select>
+          <Select aria-label="Results" value={topK} onChange={(e) => setTopK(Number(e.target.value))} className="h-10 sm:w-28">
+            {[3, 5, 8, 10].map((n) => (
+              <option key={n} value={n}>
+                {n} results
+              </option>
+            ))}
+          </Select>
+          <Button type="submit" size="lg" disabled={loading || query.trim().length < 3}>
+            {loading ? 'Searching' : 'Search'}
           </Button>
-        </CardContent>
-      </Card>
+        </form>
 
-      {/* Live Evaluation Results (When Run) */}
-      {evalData && (
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 animate-in fade-in duration-300">
-          <Card>
-            <CardContent className="p-4 text-center space-y-1">
-              <span className="text-xs text-muted-foreground font-medium">Retrieval Hit Rate</span>
-              <div className="text-2xl font-black text-emerald-600">
-                {evalData.ragEvaluation?.hitRate || 0}%
-              </div>
-              <span className="text-[10px] text-muted-foreground">
-                {evalData.ragEvaluation?.hitCount} / {evalData.ragEvaluation?.totalQueries} queries
-              </span>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4 text-center space-y-1">
-              <span className="text-xs text-muted-foreground font-medium">Top-1 Accuracy</span>
-              <div className="text-2xl font-black text-emerald-600">
-                {evalData.ragEvaluation?.top1Accuracy || 0}%
-              </div>
-              <span className="text-[10px] text-muted-foreground">Top-3: {evalData.ragEvaluation?.top3Accuracy || 0}%</span>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4 text-center space-y-1">
-              <span className="text-xs text-muted-foreground font-medium">Mean Reciprocal Rank</span>
-              <div className="text-2xl font-black text-amber-600">
-                {evalData.ragEvaluation?.mrr || 0}
-              </div>
-              <span className="text-[10px] text-muted-foreground">MRR across 30 queries</span>
-            </CardContent>
-          </Card>
-        </div>
-      )}
+        {error && <p className="text-[13px] text-destructive">{error}</p>}
 
-      {/* Search Configuration & Controls */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-xl flex items-center gap-2">
-            <BookOpen className="h-5 w-5 text-amber-500" /> Knowledge Base Search & Retrieval
-          </CardTitle>
-          <CardDescription>
-            Search Telangana rooftop solar regulations, TGREDCO guidelines, TSSPDCL procedures, and PM Surya Ghar scheme rules.
-            <span className="block mt-1 font-semibold text-foreground">
-              Pure RAG Retrieval — 1536-dim pgvector cosine similarity search.
-            </span>
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="flex flex-col gap-4">
-          <form
-            onSubmit={(e) => {
-              e.preventDefault()
-              handleSearch()
-            }}
-            className="flex gap-3"
-          >
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Ask a regulatory or technical question (e.g. What are the net-metering rules in Telangana?)"
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                className="pl-9"
-              />
-            </div>
-            <Button type="submit" disabled={loading || query.trim().length < 3} className="bg-emerald-600 hover:bg-emerald-700 text-white">
-              {loading ? 'Searching...' : 'Search'}
-            </Button>
-          </form>
-
-          {/* Quick Evaluation Query Bench */}
-          <div className="flex flex-col gap-2 pt-2 border-t">
-            <Label className="text-xs font-semibold text-muted-foreground">
-              Sample Benchmark Queries (Click to test):
-            </Label>
-            <div className="flex flex-wrap gap-2">
+        {results === null ? (
+          <div className="rounded-lg border bg-card">
+            <p className="eyebrow border-b px-5 py-2.5">Try a question</p>
+            <ul className="divide-y">
               {TELANGANA_EVALUATION_QUERIES.slice(0, 6).map((q) => (
-                <Button
-                  key={q.id}
-                  variant="outline"
-                  size="sm"
-                  className="text-xs h-7"
-                  onClick={() => {
-                    setQuery(q.query)
-                    handleSearch(q.query)
-                  }}
-                >
-                  {q.query}
-                </Button>
+                <li key={q.id}>
+                  <button
+                    type="button"
+                    onClick={() => void search(q.query)}
+                    className="flex w-full items-center justify-between gap-4 px-5 py-3 text-left text-[13px] hover:bg-muted/50"
+                  >
+                    {q.query}
+                    <Badge variant="outline">{q.expectedOrganization}</Badge>
+                  </button>
+                </li>
               ))}
-            </div>
+            </ul>
           </div>
-
-          {/* Search Hyperparameters & Filters */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2 border-t text-sm">
-            <div className="flex items-center gap-3">
-              <Label htmlFor="topK" className="whitespace-nowrap text-xs">
-                Top-K: <span className="font-bold">{topK}</span>
-              </Label>
-              <input
-                id="topK"
-                type="range"
-                min="1"
-                max="10"
-                value={topK}
-                onChange={(e) => setTopK(Number(e.target.value))}
-                className="flex-1"
-              />
+        ) : results.length === 0 ? (
+          <EmptyState title="No matching passages">
+            Try broader wording, or remove the source filter. If nothing ever matches, the knowledge base has not been
+            ingested yet (<code className="num">npm run ingest:knowledge</code>).
+          </EmptyState>
+        ) : (
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <p className="text-[13px] text-muted-foreground">
+                {results.length} passage(s) for <span className="text-foreground">{lastQuery}</span>
+              </p>
+              <AskButton question={lastQuery} size="xs">
+                Get an answer
+              </AskButton>
             </div>
-
-            <div className="flex items-center gap-3">
-              <Label htmlFor="threshold" className="whitespace-nowrap text-xs">
-                Min Similarity: <span className="font-bold">{(threshold * 100).toFixed(0)}%</span>
-              </Label>
-              <input
-                id="threshold"
-                type="range"
-                min="0.1"
-                max="0.8"
-                step="0.05"
-                value={threshold}
-                onChange={(e) => setThreshold(Number(e.target.value))}
-                className="flex-1"
-              />
-            </div>
-
-            <div className="flex items-center gap-2">
-              <Label className="text-xs whitespace-nowrap">Filter Org:</Label>
-              <select
-                className="h-8 rounded-md border bg-background px-2 text-xs flex-1"
-                value={orgFilter}
-                onChange={(e) => setOrgFilter(e.target.value)}
-              >
-                <option value="">All Organizations</option>
-                <option value="TGERC">TGERC (Regulations)</option>
-                <option value="TGREDCO">TGREDCO (Nodal Agency)</option>
-                <option value="TSSPDCL">TSSPDCL (DISCOM)</option>
-                <option value="MNRE">MNRE (Central Subsidies)</option>
-              </select>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Error Output */}
-      {error && (
-        <Card className="border-destructive/30 bg-destructive/5">
-          <CardContent className="p-4 flex items-center gap-3 text-destructive">
-            <AlertCircle className="h-5 w-5 shrink-0" />
-            <p className="text-sm font-medium">{error}</p>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Results List */}
-      {results && (
-        <div className="flex flex-col gap-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold tracking-tight">
-              Retrieved Source Passages ({results.length})
-            </h2>
-            <Badge variant="outline">{results.length > 0 ? 'Matches Found' : 'No Matches Above Threshold'}</Badge>
-          </div>
-
-          {results.length === 0 ? (
-            <Card>
-              <CardContent className="p-8 text-center text-muted-foreground text-sm">
-                No published knowledge passages met the similarity threshold ({threshold}). Try lowering the threshold or refining your search term.
-              </CardContent>
-            </Card>
-          ) : (
-            results.map((result, idx) => (
-              <Card key={result.chunkId || idx} className="hover:border-amber-500/40 transition-colors">
-                <CardHeader className="pb-2">
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="flex flex-col gap-1">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <Badge className="bg-amber-600 font-mono text-xs">
-                          # {idx + 1}
-                        </Badge>
-                        <Badge variant="secondary" className="font-medium">
-                          {result.source.organization}
-                        </Badge>
-                        <Badge variant="outline" className="text-xs">
-                          {result.source.documentType}
-                        </Badge>
-                        {result.source.locationScope && (
-                          <Badge variant="outline" className="text-xs bg-slate-50 dark:bg-slate-900">
-                            📍 {result.source.locationScope}
-                          </Badge>
-                        )}
-                      </div>
-                      <CardTitle className="text-base font-bold mt-1">
-                        {result.source.title}
-                      </CardTitle>
-                    </div>
-
-                    <div className="flex flex-col items-end gap-1 shrink-0">
-                      <span className="text-xs text-muted-foreground">Cosine Similarity</span>
-                      <span className="text-sm font-bold font-mono text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/60 px-2 py-0.5 rounded border border-amber-200 dark:border-amber-800">
-                        {(result.similarity * 100).toFixed(1)}% ({result.similarity})
-                      </span>
-                    </div>
+            {results.map((result, i) => (
+              <article key={result.chunkId || i} className="rounded-lg border bg-card">
+                <header className="flex flex-wrap items-center justify-between gap-2 border-b px-5 py-3">
+                  <div className="min-w-0">
+                    <p className="truncate text-[13px] font-medium">{result.source.title}</p>
+                    <p className="text-[12px] text-muted-foreground">
+                      {result.source.organization}
+                      {result.sectionTitle && ` · ${result.sectionTitle}`}
+                      {result.pageNumber != null && ` · page ${result.pageNumber}`}
+                    </p>
                   </div>
-                </CardHeader>
-
-                <CardContent className="flex flex-col gap-3 text-sm">
-                  {(result.sectionTitle || result.pageNumber != null) && (
-                    <div className="flex items-center gap-4 text-xs text-muted-foreground bg-muted/40 px-3 py-1.5 rounded">
-                      {result.sectionTitle && (
-                        <span>
-                          <strong>Section:</strong> {result.sectionTitle}
-                        </span>
-                      )}
-                      {result.pageNumber != null && (
-                        <span>
-                          <strong>Page:</strong> {result.pageNumber}
-                        </span>
-                      )}
-                      <span>
-                        <strong>Chunk #:</strong> {result.chunkIndex}
-                      </span>
-                    </div>
-                  )}
-
-                  <div className="p-3 bg-card border rounded-md font-mono text-xs leading-relaxed whitespace-pre-wrap">
-                    {result.content}
-                  </div>
-
-                  <div className="flex items-center justify-between text-xs text-muted-foreground border-t pt-2 mt-1">
-                    <span>
-                      Effective: {result.source.effectiveDate || result.source.publicationDate || 'N/A'}
-                      {result.source.version ? ` | Version: ${result.source.version}` : ''}
-                    </span>
+                  <span className="num text-[12px] text-muted-foreground">{fmtNum(result.similarity * 100, 1)}% match</span>
+                </header>
+                <p className="px-5 py-4 text-[13px] leading-6 whitespace-pre-wrap">{result.content}</p>
+                <footer className="flex items-center justify-between border-t px-5 py-2.5 text-[12px] text-muted-foreground">
+                  <span className="num">
+                    {result.source.effectiveDate || result.source.publicationDate || 'Date not stated'}
+                    {result.source.version ? ` · ${result.source.version}` : ''}
+                  </span>
+                  {result.source.sourceUrl && (
                     <a
                       href={result.source.sourceUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="flex items-center gap-1 text-primary hover:underline font-medium"
+                      className="inline-flex items-center gap-1 text-primary hover:underline"
                     >
-                      Official Source Document <ExternalLink className="h-3 w-3" />
+                      Source <ExternalLink className="size-3" />
                     </a>
+                  )}
+                </footer>
+              </article>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div className="space-y-4">
+        <Card>
+          <CardHeader>
+            <div>
+              <CardTitle>Retrieval quality</CardTitle>
+              <CardDescription>Runs {TELANGANA_EVALUATION_QUERIES.length} labelled questions against the index.</CardDescription>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {r && (
+              <dl className="divide-y text-[13px]">
+                {[
+                  ['Hit rate', `${fmtNum(r.hitRate ?? 0, 1)}%`],
+                  ['Top-1 accuracy', `${fmtNum(r.top1Accuracy ?? 0, 1)}%`],
+                  ['Top-3 accuracy', `${fmtNum(r.top3Accuracy ?? 0, 1)}%`],
+                  ['Mean reciprocal rank', fmtNum(r.mrr ?? 0, 3)],
+                ].map(([k, v]) => (
+                  <div key={k} className="flex justify-between py-2 first:pt-0">
+                    <dt className="text-muted-foreground">{k}</dt>
+                    <dd className="num">{v}</dd>
                   </div>
-                </CardContent>
-              </Card>
-            ))
-          )}
+                ))}
+              </dl>
+            )}
+            {evalError && <p className="text-[12px] text-destructive">{evalError}</p>}
+            <Button variant="outline" size="sm" className="w-full" onClick={runEvaluation} disabled={evalLoading}>
+              {evalLoading ? 'Running' : r ? 'Run again' : 'Run evaluation'}
+            </Button>
+          </CardContent>
+        </Card>
+        <div className="space-y-2 px-1 text-[12px] text-muted-foreground">
+          <Label className="text-[12px] text-muted-foreground">About these documents</Label>
+          <p>
+            The bundled documents are unofficial summaries labelled as such. Ingest the official PDFs for verbatim
+            citations.
+          </p>
         </div>
-      )}
+      </div>
     </div>
   )
 }

@@ -18,6 +18,7 @@ import { estimateHourlyPower, shadingFactorFor, sumEnergyKwh, type PvSystem } fr
 import { calculateOptimalSystemSize } from '@/lib/calculations/systemSizing'
 import { calculateTelanganaTariff } from '@/lib/calculations/tariffs'
 import { summariseGrid, type GridSummary } from './grid'
+import { fitCalibration, type Calibration } from '@/lib/solar/calibration'
 import type { SolarProfile } from '@/lib/types/user'
 
 export type HourlyPoint = { hour: string; output: number }
@@ -52,6 +53,9 @@ export type DashboardOverview = {
   hasConsumptionData: boolean
   daily: DailyPoint[]
   grid: GridSummary | null
+  /** Fit of the weather model to the user's logged days (null until enough days are logged). */
+  calibration: Calibration | null
+  monthToDate: { loggedKwh: number; savedInr: number | null; days: number } | null
   /** Current LT-I bill estimate from average units, using the sanctioned load for the fixed charge. */
   billEstimate: {
     monthlyUnits: number
@@ -64,6 +68,9 @@ export type DashboardOverview = {
 }
 
 const IST_OFFSET_MS = 5.5 * 3600 * 1000
+/** Days of history used to calibrate the model; the UI shows the most recent DISPLAY_DAYS. */
+const CALIBRATION_WINDOW_DAYS = 90
+const DISPLAY_DAYS = 30
 
 export function istNow(now = new Date()): Date {
   return new Date(now.getTime() + IST_OFFSET_MS)
@@ -97,7 +104,7 @@ export async function buildDashboardOverview(userId: string): Promise<DashboardO
   const [profile, history, generation, system] = await Promise.all([
     getSolarProfile(userId),
     getUserConsumptionHistory(userId),
-    getGenerationHistory(30, userId),
+    getGenerationHistory(CALIBRATION_WINDOW_DAYS, userId),
     getActiveSolarSystem(userId),
   ])
 
@@ -127,6 +134,10 @@ export async function buildDashboardOverview(userId: string): Promise<DashboardO
 
   const tariff = pickTariff(profile, stats, monthlyUnits)
   const todayIst = istDateString()
+  const displayFrom = istDateString(new Date(Date.now() - DISPLAY_DAYS * 24 * 3600 * 1000))
+  const recentGeneration = generation.filter((g) => g.recordDate >= displayFrom)
+  const monthPrefix = todayIst.slice(0, 7)
+  const thisMonth = generation.filter((g) => g.recordDate.startsWith(monthPrefix))
   const loggedToday = generation.find((g) => g.recordDate === todayIst)?.generationKwh ?? null
 
   const base: DashboardOverview = {
@@ -141,7 +152,16 @@ export async function buildDashboardOverview(userId: string): Promise<DashboardO
     sizing,
     hasConsumptionData: history.length > 0,
     daily: [],
-    grid: summariseGrid(generation),
+    grid: summariseGrid(recentGeneration),
+    calibration: null,
+    monthToDate: thisMonth.length
+      ? {
+          loggedKwh: round(thisMonth.reduce((a, g) => a + g.generationKwh, 0)),
+          savedInr:
+            tariff.rate != null ? round(thisMonth.reduce((a, g) => a + g.selfConsumedKwh, 0) * tariff.rate) : null,
+          days: thisMonth.length,
+        }
+      : null,
     billEstimate: monthlyUnits
       ? (() => {
           const bill = calculateTelanganaTariff(monthlyUnits, {
@@ -166,7 +186,7 @@ export async function buildDashboardOverview(userId: string): Promise<DashboardO
   }
 
   if (!basis) {
-    base.daily = dailyFromLogs(generation, tariff.rate, new Map())
+    base.daily = dailyFromLogs(recentGeneration, tariff.rate, new Map())
     return base
   }
 
@@ -184,14 +204,28 @@ export async function buildDashboardOverview(userId: string): Promise<DashboardO
     const coords = await geocode(profile?.city || 'Hyderabad', profile?.state)
     base.location = coords
 
-    const thirtyAgo = istDateString(new Date(Date.now() - 31 * 24 * 3600 * 1000))
+    const windowStart = istDateString(new Date(Date.now() - (CALIBRATION_WINDOW_DAYS + 1) * 24 * 3600 * 1000))
     const yesterday = istDateString(new Date(Date.now() - 24 * 3600 * 1000))
     const [forecast, archive] = await Promise.all([
       getHourlyWeather(coords, surface, { forecastDays: 1 }),
-      getArchivedHourlyWeather(coords, thirtyAgo, yesterday, surface).catch(() => []),
+      getArchivedHourlyWeather(coords, windowStart, yesterday, surface).catch(() => []),
     ])
 
-    const power = estimateHourlyPower(forecast, pv)
+    // Calibrate on every day that has both a logged reading and observed weather.
+    const modelledByDay = new Map<string, number>()
+    for (const p of estimateHourlyPower(archive, pv)) {
+      const d = p.time.slice(0, 10)
+      modelledByDay.set(d, (modelledByDay.get(d) ?? 0) + p.kw)
+    }
+    const calibration = fitCalibration(
+      generation
+        .filter((g) => modelledByDay.has(g.recordDate))
+        .map((g) => ({ loggedKwh: g.generationKwh, modelledKwh: modelledByDay.get(g.recordDate)! }))
+    )
+    const k = calibration?.factor ?? 1
+    base.calibration = calibration
+
+    const power = estimateHourlyPower(forecast, pv).map((p) => ({ ...p, kw: Math.round(p.kw * k * 1000) / 1000 }))
     const todays = power.filter((p) => p.time.startsWith(todayIst))
     const daylight = todays.filter((p) => p.kw > 0)
     const first = todays.findIndex((p) => p.kw > 0)
@@ -209,17 +243,14 @@ export async function buildDashboardOverview(userId: string): Promise<DashboardO
       loggedKwh: loggedToday,
     }
 
-    const modelledByDay = new Map<string, number>()
-    const archivePower = estimateHourlyPower(archive, pv)
-    for (const p of archivePower) {
-      const d = p.time.slice(0, 10)
-      modelledByDay.set(d, (modelledByDay.get(d) ?? 0) + p.kw)
-    }
-    base.daily = dailyFromLogs(generation, tariff.rate, modelledByDay)
+    const displayModelled = new Map(
+      [...modelledByDay].filter(([d]) => d >= displayFrom).map(([d, v]) => [d, v * k] as const)
+    )
+    base.daily = dailyFromLogs(recentGeneration, tariff.rate, displayModelled)
   } catch (err) {
     if (!(err instanceof WeatherUnavailableError)) throw err
     base.weather = { available: false, error: err.message }
-    base.daily = dailyFromLogs(generation, tariff.rate, new Map())
+    base.daily = dailyFromLogs(recentGeneration, tariff.rate, new Map())
   }
 
   return base

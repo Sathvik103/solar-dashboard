@@ -27,7 +27,7 @@ export async function getRegionalStatisticsTool(input: GetRegionalStatisticsInpu
     climatology: clim
       ? {
           place: clim.place,
-          source: 'ERA5 reanalysis via Open-Meteo (3-year monthly mean)',
+          source: 'ERA5 reanalysis via Open-Meteo (10-year monthly mean)',
           monthly: clim.monthly.map((m) => ({ month: m.month + 1, ghiKwhPerM2PerDay: m.ghiKwhM2Day, meanTempC: m.tempC })),
         }
       : null,

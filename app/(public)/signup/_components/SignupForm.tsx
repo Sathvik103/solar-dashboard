@@ -24,12 +24,12 @@ export default function SignupForm() {
           id="full_name"
           name="full_name"
           type="text"
-          placeholder="Sathvik Sharma"
+          placeholder="Your name"
           required
           disabled={isPending}
         />
         {state?.errors?.fullName && (
-          <p className="text-xs text-destructive">{state.errors.fullName[0]}</p>
+          <p className="text-[12px] text-destructive">{state.errors.fullName[0]}</p>
         )}
       </div>
 
@@ -44,7 +44,7 @@ export default function SignupForm() {
           disabled={isPending}
         />
         {state?.errors?.email && (
-          <p className="text-xs text-destructive">{state.errors.email[0]}</p>
+          <p className="text-[12px] text-destructive">{state.errors.email[0]}</p>
         )}
       </div>
 
@@ -59,7 +59,7 @@ export default function SignupForm() {
           disabled={isPending}
         />
         {state?.errors?.password && (
-          <p className="text-xs text-destructive">{state.errors.password[0]}</p>
+          <p className="text-[12px] text-destructive">{state.errors.password[0]}</p>
         )}
       </div>
 
@@ -67,7 +67,7 @@ export default function SignupForm() {
         {isPending ? 'Creating account...' : 'Create Account'}
       </Button>
 
-      <p className="text-center text-sm text-muted-foreground mt-4">
+      <p className="text-center text-[13px] text-muted-foreground">
         Already have an account?{' '}
         <Link href="/login" className="text-primary hover:underline font-medium">
           Sign in

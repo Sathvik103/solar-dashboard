@@ -13,7 +13,7 @@
 export const AI_CONFIG = {
   embedding: {
     provider: 'google-gemini',
-    model: 'text-embedding-004', // gemini embedding model alias or text-embedding-004
+    model: 'gemini-embedding-001',
     fallbackModel: 'gemini-embedding-001',
     dimension: 1536,
   },

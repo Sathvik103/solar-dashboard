@@ -1,19 +1,17 @@
 import { requireUser } from '@/lib/dal/users'
+import { Page } from '@/components/layout/Page'
 import KnowledgeSearchBench from './_components/KnowledgeSearchBench'
+
+export const metadata = { title: 'Regulations' }
 
 export default async function KnowledgePage() {
   await requireUser()
-
   return (
-    <div className="p-8 max-w-5xl mx-auto flex flex-col gap-6">
-      <div>
-        <h1 className="text-2xl font-bold">Solar Knowledge Base</h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          Explore and query Telangana rooftop solar regulations, policies, and subsidies with verifiable source provenance.
-        </p>
-      </div>
-
+    <Page
+      title="Regulations"
+      description="Search Telangana net-metering rules, DISCOM procedures and PM Surya Ghar guidelines. Every passage links to its source document."
+    >
       <KnowledgeSearchBench />
-    </div>
+    </Page>
   )
 }

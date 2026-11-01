@@ -1,6 +1,21 @@
-# Solar Intelligence Platform
+# SolarIntel
 
 Next.js 16 + Supabase app that helps Telangana households size, price and monitor rooftop solar.
+
+## Product
+
+- **Overview**: output now and today, savings this month, the model's calibration, 30-day logged vs modelled
+  generation, grid exchange and the sizing recommendation.
+- **Energy log**: add daily readings, monthly bills or CSV imports; per-day logged vs modelled table.
+- **Planner**: what-if sizing with climate-driven monthly yield, slab-based savings, 25-year cashflow, size options,
+  panel technology and feasibility checks.
+- **Regulations**: retrieval over the knowledge base with sources and a retrieval-quality benchmark.
+- **Settings**: profile, sanctioned load, roof, and device tokens for telemetry.
+- **Assistant**: a panel available on every page (Ctrl+J). Answers use the user's profile and data, the
+  deterministic calculators and retrieved documents, and list their sources.
+
+Design: IBM Plex Sans and Plex Mono (all figures tabular), warm paper surfaces, graphite ink and one terracotta
+accent; tokens live in `app/globals.css`.
 
 ## Where the numbers come from
 
@@ -9,12 +24,14 @@ Nothing on the dashboard is hard-coded or randomly generated.
 | Figure | Source |
 | --- | --- |
 | Hourly output / today's kWh | Physics PV model (`lib/solar/pvModel.ts`) driven by live plane-of-array irradiance and temperature from [Open-Meteo](https://open-meteo.com) for your city. Labelled "modelled". |
+| Model calibration | Least-squares fit of the model to every logged day in the last 90 days with matching ERA5 weather (`lib/solar/calibration.ts`); needs 7 days, factor clamped to 0.5–1.3, error shown before and after. |
+| Planner savings | Month-by-month: climate-driven yield for each month, valued against the LT-I slab ladder. |
 | Logged generation, exports, imports | Entered by you (form or CSV) on **History**, or pushed by your inverter/logger to `POST /api/telemetry` → `solar_generation_history`. |
 | Consumption, bills, tariff | Entered by you / CSV → `consumption_history`. Tariff = profile value, else bill-derived, else the marginal LT-I slab rate. |
 | LT-I tariff slabs | TGSPDCL schedule FY 2025-26, retained for FY 2026-27 (`lib/calculations/tariffs.ts`). Excludes electricity duty, FSA and ToD. |
 | Net-metering export credit | TGERC APPC FY 2025-26, ₹5.330/kWh. |
 | PM Surya Ghar subsidy | MNRE: ₹30k/kW for the first 2 kW + ₹18k for the 3rd kW, capped at ₹78k (pro-rated). |
-| Monthly climatology (Studio, chat, ML export) | ERA5 reanalysis via Open-Meteo archive (3-year mean). |
+| Monthly climatology (Studio, chat, ML export) | ERA5 reanalysis via Open-Meteo archive (10-year mean). |
 | Forecast metrics (MAE/RMSE/R²) | Computed from real `ml_predictions` prediction/actual pairs only. |
 | Regulations / subsidy answers | RAG over ingested TGERC / TGREDCO / MNRE documents with citations. |
 
@@ -23,12 +40,16 @@ When data is missing the UI says so (empty states, `—`) instead of substitutin
 ## Setup
 
 ```bash
-cp .env.example .env.local   # fill in Supabase + GEMINI_API_KEY
+cp .env.example .env.local   # Supabase, GEMINI_API_KEY; optional GEMINI_MODEL, SUPABASE_SERVICE_ROLE_KEY
 npm install
 npm run dev
 ```
 
-Apply `supabase/migrations/*.sql` in order (001–009). Run `npm run ingest:knowledge` once to load the knowledge base.
+Apply `supabase/migrations/*.sql` in order (001–009). Run `npm run ingest:knowledge` once to load the knowledge base; it needs `SUPABASE_SERVICE_ROLE_KEY`
+because the document tables are writable only by the service role.
+
+The assistant uses `gemini-3.5-flash`, falling back to `gemini-3.1-flash-lite` (25 s per attempt). Set
+`GEMINI_MODEL` to try a different model first. Older IDs such as `gemini-2.5-flash` return 404 for new keys.
 
 ## Scripts
 

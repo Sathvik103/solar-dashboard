@@ -1,15 +1,12 @@
 import Link from 'next/link'
-import { ArrowDownLeft, ArrowUpRight, PlugZap, AlertTriangle } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { fmtInr, fmtNum } from '@/components/layout/Page'
 import type { DashboardOverview } from '@/lib/dashboard/overview'
 
-const kwh = (n: number) => `${n.toLocaleString('en-IN', { maximumFractionDigits: 1 })} kWh`
-const inr = (n: number) => `₹${Math.round(n).toLocaleString('en-IN')}`
-
 const SOURCE_LABEL: Record<string, string> = {
-  inverter_telemetry: 'Device telemetry',
-  manual_log: 'Manual log',
+  inverter_telemetry: 'Device',
+  manual_log: 'Manual',
   estimated: 'Estimate',
 }
 
@@ -20,68 +17,65 @@ export default function GridExchangeCard({
 }: Pick<DashboardOverview, 'grid' | 'billEstimate' | 'loadCheck'>) {
   return (
     <Card>
-      <CardHeader className="pb-3">
-        <CardTitle className="text-sm font-bold flex items-center gap-2">
-          <PlugZap className="h-4 w-4 text-emerald-600" />
-          <span>Grid exchange (last 30 days)</span>
-        </CardTitle>
+      <CardHeader>
+        <CardTitle>Grid exchange</CardTitle>
+        {grid && (
+          <Badge variant="outline">{SOURCE_LABEL[grid.lastReadingSource] ?? grid.lastReadingSource}</Badge>
+        )}
       </CardHeader>
-      <CardContent className="space-y-3 text-xs">
+      <CardContent className="space-y-4 text-[13px]">
         {grid ? (
           <>
-            <div className="grid grid-cols-2 gap-2">
-              <div className="p-2.5 rounded-lg bg-muted/40">
-                <span className="flex items-center gap-1 text-muted-foreground">
-                  <ArrowUpRight className="h-3 w-3" /> Exported
-                </span>
-                <span className="font-bold text-foreground">{kwh(grid.exportedKwh)}</span>
-              </div>
-              <div className="p-2.5 rounded-lg bg-muted/40">
-                <span className="flex items-center gap-1 text-muted-foreground">
-                  <ArrowDownLeft className="h-3 w-3" /> Imported
-                </span>
-                <span className="font-bold text-foreground">{kwh(grid.importedKwh)}</span>
-              </div>
-            </div>
-            <p className="text-muted-foreground">
-              Net {grid.netExportKwh >= 0 ? 'surplus' : 'draw'}:{' '}
-              <span className="font-semibold text-foreground">{kwh(Math.abs(grid.netExportKwh))}</span>
-              {grid.surplusValueAtAppcInr != null && (
-                <> · worth ~{inr(grid.surplusValueAtAppcInr)} at APPC if still unadjusted on 31 March</>
-              )}
-            </p>
-            <p className="text-muted-foreground flex items-center gap-1.5 flex-wrap">
-              Last reading {grid.lastReadingDate}
-              <Badge variant="outline" className="text-[10px]">
-                {SOURCE_LABEL[grid.lastReadingSource] ?? grid.lastReadingSource}
-              </Badge>
-              · {grid.days} day(s) logged
+            <dl className="divide-y">
+              {[
+                ['Exported', `${fmtNum(grid.exportedKwh, 1)} kWh`],
+                ['Imported', `${fmtNum(grid.importedKwh, 1)} kWh`],
+                ['Used on site', `${fmtNum(grid.selfConsumedKwh, 1)} kWh`],
+                [grid.netExportKwh >= 0 ? 'Net surplus' : 'Net draw', `${fmtNum(Math.abs(grid.netExportKwh), 1)} kWh`],
+              ].map(([k, v]) => (
+                <div key={k} className="flex justify-between py-2 first:pt-0">
+                  <dt className="text-muted-foreground">{k}</dt>
+                  <dd className="num">{v}</dd>
+                </div>
+              ))}
+            </dl>
+            <p className="text-[12px] text-muted-foreground">
+              {grid.days} day(s) in the last 30, latest {grid.lastReadingDate}.
+              {grid.surplusValueAtAppcInr != null &&
+                ` Surplus worth about ${fmtInr(grid.surplusValueAtAppcInr)} if still unadjusted on 31 March.`}
             </p>
           </>
         ) : (
           <p className="text-muted-foreground">
-            No meter readings yet. <Link href="/history" className="underline">Log a day</Link> or{' '}
-            <Link href="/profile" className="underline">connect a device</Link>.
+            No meter readings yet.{' '}
+            <Link href="/history" className="text-primary underline underline-offset-2">
+              Log a day
+            </Link>{' '}
+            or{' '}
+            <Link href="/profile" className="text-primary underline underline-offset-2">
+              connect a device
+            </Link>
+            .
           </p>
         )}
 
         {billEstimate && (
-          <p className="text-muted-foreground border-t pt-2">
-            Typical bill ({billEstimate.monthlyUnits} kWh, {billEstimate.subcategory}):{' '}
-            <span className="font-semibold text-foreground">{inr(billEstimate.totalInr)}</span>
-            <span className="block text-[10px]">
-              Excludes electricity duty and FSA.
-              {billEstimate.fixedChargeBasis === 'minimum-1kw' &&
-                ' Fixed charge assumes 1 kW; add your sanctioned load in your profile.'}
-            </span>
-          </p>
+          <div className="border-t pt-3">
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Typical bill</span>
+              <span className="num">{fmtInr(billEstimate.totalInr)}</span>
+            </div>
+            <p className="mt-1 text-[12px] text-muted-foreground">
+              {fmtNum(billEstimate.monthlyUnits)} kWh on {billEstimate.subcategory}, before duty and FSA.
+              {billEstimate.fixedChargeBasis === 'minimum-1kw' && ' Fixed charge assumes 1 kW sanctioned load.'}
+            </p>
+          </div>
         )}
 
         {loadCheck?.exceeds && (
-          <p role="alert" className="flex gap-1.5 text-amber-600">
-            <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
-            A {loadCheck.capacityKw} kW system exceeds your {loadCheck.sanctionedLoadKw} kW sanctioned load. Net-metering
-            capacity is limited to the sanctioned load, so you may need to apply for a load enhancement first.
+          <p role="alert" className="border-t pt-3 text-[12px] text-warning">
+            {fmtNum(loadCheck.capacityKw, 1)} kW is above your {fmtNum(loadCheck.sanctionedLoadKw, 1)} kW sanctioned
+            load. Net-metering capacity is limited to sanctioned load, so a load enhancement may be needed first.
           </p>
         )}
       </CardContent>

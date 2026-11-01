@@ -13,6 +13,13 @@ const nextConfig: NextConfig = {
   async headers() {
     return [{ source: '/:path*', headers: securityHeaders }]
   },
+  async redirects() {
+    return [
+      // The assistant is a panel available on every page; the calculator lives in the planner.
+      { source: '/chat/:path*', destination: '/dashboard', permanent: true },
+      { source: '/calculator', destination: '/analysis', permanent: true },
+    ]
+  },
 }
 
 export default nextConfig

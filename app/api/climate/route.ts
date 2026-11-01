@@ -24,7 +24,7 @@ export async function GET() {
     return NextResponse.json(
       {
         place: coords.label,
-        source: 'ERA5 reanalysis via Open-Meteo (3-year monthly mean)',
+        source: 'ERA5 reanalysis via Open-Meteo (10-year monthly mean)',
         monthly: monthly.map((m) => ({ month: MONTHS[m.month], ghi: m.ghiKwhM2Day, avgTempC: m.tempC })),
       },
       { headers: { 'Cache-Control': 'private, max-age=86400' } }

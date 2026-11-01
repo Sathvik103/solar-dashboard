@@ -57,7 +57,7 @@ export async function runIngestion() {
   const supabase = createClient(SUPABASE_URL, activeKey)
 
   if (!SUPABASE_SERVICE_KEY) {
-    console.log('\n⚠️ Notice: SUPABASE_SERVICE_ROLE_KEY is not set in environment.')
+    console.log('\nNotice: SUPABASE_SERVICE_ROLE_KEY is not set in environment.')
     console.log('   Knowledge Base writes are protected by PostgreSQL RLS.')
     console.log('   To ingest documents directly into Supabase, add SUPABASE_SERVICE_ROLE_KEY to .env.local')
   }
@@ -73,7 +73,7 @@ export async function runIngestion() {
   let totalChunks = 0
 
   for (const doc of docsToIngest) {
-    console.log(`\n📄 Processing: [${doc.organization}] ${doc.title}`)
+    console.log(`\nProcessing: [${doc.organization}] ${doc.title}`)
     const contentHash = crypto.createHash('sha256').update(doc.content).digest('hex')
 
     // 1. Chunk document
@@ -86,12 +86,12 @@ export async function runIngestion() {
       console.log(`   Generating 1536-dim Gemini embeddings...`)
       try {
         embeddings = await generateEmbeddings(chunks.map((c) => c.content), GEMINI_KEY)
-        console.log(`   ✅ Generated ${embeddings.length} vectors successfully.`)
+        console.log(`   Generated ${embeddings.length} vectors successfully.`)
       } catch (err) {
-        console.warn(`   ⚠️ Embedding generation failed: ${err instanceof Error ? err.message : String(err)}`)
+        console.warn(`   Embedding generation failed: ${err instanceof Error ? err.message : String(err)}`)
       }
     } else {
-      console.log(`   ℹ️ No GEMINI_API_KEY present in environment. Ingesting chunks without vector embeddings.`)
+      console.log(`   No GEMINI_API_KEY present in environment. Ingesting chunks without vector embeddings.`)
     }
 
     // 3. Upsert document
@@ -118,7 +118,7 @@ export async function runIngestion() {
       .single()
 
     if (docErr || !docData) {
-      console.error(`   ❌ Failed to upsert document: ${docErr?.message}`)
+      console.error(`   Failed to upsert document: ${docErr?.message}`)
       continue
     }
 
@@ -142,10 +142,10 @@ export async function runIngestion() {
 
     const { error: chunkErr } = await supabase.from('document_chunks').insert(chunkRows)
     if (chunkErr) {
-      console.error(`   ❌ Failed to insert chunks: ${chunkErr.message}`)
+      console.error(`   Failed to insert chunks: ${chunkErr.message}`)
     } else {
       totalChunks += chunkRows.length
-      console.log(`   ✅ Stored ${chunkRows.length} chunks in database.`)
+      console.log(`   Stored ${chunkRows.length} chunks in database.`)
     }
   }
 

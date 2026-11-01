@@ -210,10 +210,10 @@ function generateFallbackDeterministicResponse(
   tools: any[],
   citations: any[]
 ): string {
-  let response = `### Solar Intelligence Analysis\n\n`
+  let response = `The language model is unavailable right now, so this answer lists the calculated figures only.\n\n`
 
   if (tools.length > 0) {
-    response += `**Calculation Summary:**\n`
+    response += `**Figures**\n\n`
     for (const t of tools) {
       if (t.output && typeof t.output === 'object') {
         if (t.tool === 'calculateSystemCost') {
@@ -230,7 +230,7 @@ function generateFallbackDeterministicResponse(
   }
 
   if (citations.length > 0) {
-    response += `**Relevant Regulatory Rules:**\n`
+    response += `**Relevant documents**\n\n`
     for (const c of citations) {
       response += `- **[${c.organization}] ${c.title}**: ${c.snippet}\n`
     }

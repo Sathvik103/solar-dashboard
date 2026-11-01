@@ -1,274 +1,260 @@
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
-import OutputChart from '@/components/charts/OutputChart'
-import GridExchangeCard from '@/components/GridExchangeCard'
-import { NET_METERING_SETTLEMENT_SOURCE, TARIFF_SOURCE } from '@/lib/calculations/tariffs'
-import { AnimatedCard, AnimatedContainer } from '@/components/AnimatedCard'
-import PageWrapper from '@/components/layout/PageWrapper'
+import Link from 'next/link'
+import { ArrowRight } from 'lucide-react'
 import { requireUser } from '@/lib/dal/users'
 import { buildDashboardOverview } from '@/lib/dashboard/overview'
-import Link from 'next/link'
-import {
-  Sun,
-  Zap,
-  IndianRupee,
-  Leaf,
-  Sparkles,
-  Sliders,
-  ArrowRight,
-  BookOpen,
-  } from 'lucide-react'
+import { NET_METERING_SETTLEMENT_SOURCE, TARIFF_SOURCE } from '@/lib/calculations/tariffs'
+import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { EmptyState, Notice, Page, Stat, StatGrid, fmtInr, fmtNum } from '@/components/layout/Page'
+import { DailyEnergyChart, Legend, TodayOutputChart } from '@/components/charts/EnergyCharts'
+import GridExchangeCard from '@/components/GridExchangeCard'
+import AskButton from '@/components/assistant/AskButton'
+
+export const metadata = { title: 'Overview' }
+
+const BASIS_LABEL = { installed: 'installed system', preferred: 'preferred size', recommended: 'recommended size' }
+const TARIFF_LABEL = { profile: 'from your profile', 'bill-history': 'from your bills', 'slab-model': 'marginal LT-I slab' }
 
 export default async function DashboardPage() {
   const user = await requireUser()
-  const overview = await buildDashboardOverview(user.id)
-  const { profile, sizing, today, basis, tariffInrPerKwh } = overview
-  const monthlyUnits = overview.stats.averageMonthlyConsumption ?? profile?.monthlyUnitsKwh ?? null
-  const measured = today.loggedKwh
-  const todayKwh = measured ?? today.modelledKwh
-  const todaySaved = todayKwh != null && tariffInrPerKwh != null ? todayKwh * tariffInrPerKwh : null
-  const estimateTag = measured == null ? 'Modelled estimate' : 'Logged reading'
+  const o = await buildDashboardOverview(user.id)
+  const { profile, sizing, today, basis, tariffInrPerKwh: tariff, calibration } = o
+
+  const todayKwh = today.loggedKwh ?? today.modelledKwh
+  const todayIsLogged = today.loggedKwh != null
+  const place = o.location?.label ?? profile?.city ?? null
 
   return (
-    <PageWrapper>
-      {/* Welcome Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight text-foreground flex items-center gap-2">
-            <span>Solar Intelligence Dashboard</span>
-            <Badge className="bg-emerald-600 font-mono text-xs">
-              {profile?.city || 'Set location'}{profile?.state ? `, ${profile.state}` : ''}
-            </Badge>
-          </h1>
-          <p className="text-xs text-muted-foreground mt-1">
-            Output modelled from live weather for your system, plus the readings and bills you log.
-          </p>
-        </div>
+    <Page
+      title="Overview"
+      description={
+        basis
+          ? `${fmtNum(basis.capacityKw, 1)} kW ${BASIS_LABEL[basis.kind]}${place ? ` in ${place}` : ''}.`
+          : 'Add your consumption to see modelled output and savings.'
+      }
+      actions={
+        <>
+          <Button asChild variant="outline" size="sm">
+            <Link href="/history">Log a reading</Link>
+          </Button>
+          <AskButton question="Summarise my solar performance and savings this month.">Ask about this</AskButton>
+        </>
+      }
+    >
+      {!sizing && !basis && (
+        <Notice>
+          Nothing here is estimated until it is based on your inputs. Add your monthly units in{' '}
+          <Link href="/profile" className="text-primary underline underline-offset-2">
+            Settings
+          </Link>{' '}
+          or record bills in the{' '}
+          <Link href="/history" className="text-primary underline underline-offset-2">
+            Energy log
+          </Link>
+          .
+        </Notice>
+      )}
+      {basis && !o.weather.available && (
+        <Notice tone="warning">
+          Live weather is unavailable{o.weather.error ? ` (${o.weather.error})` : ''}. Modelled values are hidden rather
+          than guessed.
+        </Notice>
+      )}
 
-        <div className="flex items-center gap-2">
-          <Link href="/analysis">
-            <Button size="sm" variant="outline" className="text-xs gap-1.5 h-8">
-              <Sliders className="h-3.5 w-3.5 text-emerald-600" />
-              <span>Solar Studio</span>
-            </Button>
-          </Link>
-          <Link href="/chat">
-            <Button size="sm" className="text-xs gap-1.5 h-8 bg-emerald-600 hover:bg-emerald-700 text-white">
-              <Sparkles className="h-3.5 w-3.5 text-amber-300" />
-              <span>Ask Solar Agent</span>
-            </Button>
-          </Link>
-        </div>
+      <StatGrid>
+        <Stat
+          label="Output now"
+          value={today.currentKw != null ? fmtNum(today.currentKw, 2) : '—'}
+          unit="kW"
+          note={
+            basis ? (calibration ? 'Modelled, calibrated to your readings' : 'Modelled from live weather') : 'Needs a system size'
+          }
+        />
+        <Stat
+          label="Today"
+          value={todayKwh != null ? fmtNum(todayKwh, 1) : '—'}
+          unit="kWh"
+          note={todayKwh == null ? 'No data yet' : todayIsLogged ? 'Logged reading' : 'Forecast for the full day'}
+        />
+        <Stat
+          label="Saved this month"
+          value={o.monthToDate?.savedInr != null ? fmtInr(o.monthToDate.savedInr) : '—'}
+          tone={o.monthToDate?.savedInr ? 'positive' : undefined}
+          note={
+            o.monthToDate
+              ? `${fmtNum(o.monthToDate.loggedKwh, 1)} kWh over ${o.monthToDate.days} logged day(s)`
+              : 'Log readings to track savings'
+          }
+        />
+        <Stat
+          label="Tariff per kWh"
+          value={tariff != null ? `₹${fmtNum(tariff, 2)}` : '—'}
+          note={o.tariffSource ? TARIFF_LABEL[o.tariffSource] : 'Add a bill or monthly units'}
+        />
+      </StatGrid>
+
+      <div className="grid gap-6 lg:grid-cols-3">
+        <Card className="lg:col-span-2">
+          <CardHeader>
+            <div>
+              <CardTitle>Output today</CardTitle>
+              <CardDescription>Hourly estimate from irradiance and temperature at your location.</CardDescription>
+            </div>
+            {today.modelledKwh != null && (
+              <span className="num text-[13px] text-muted-foreground">{fmtNum(today.modelledKwh, 1)} kWh</span>
+            )}
+          </CardHeader>
+          <CardContent>
+            {today.hourly.length ? (
+              <TodayOutputChart data={today.hourly} />
+            ) : (
+              <EmptyState title="No estimate yet">Set a system size or monthly units in Settings.</EmptyState>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Model</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4 text-[13px]">
+            <dl className="divide-y">
+              {[
+                ['System', basis ? `${fmtNum(basis.capacityKw, 1)} kW, ${BASIS_LABEL[basis.kind]}` : 'Not set'],
+                ['Weather', o.weather.available ? 'Open-Meteo, hourly' : 'Unavailable'],
+                ['Calibration', calibration ? `×${calibration.factor} from ${calibration.days} days` : 'Needs 7 logged days'],
+                [
+                  'Daily error',
+                  calibration
+                    ? `${fmtNum(calibration.mapeBeforePercent, 1)}% → ${fmtNum(calibration.mapeAfterPercent, 1)}%`
+                    : '—',
+                ],
+              ].map(([k, v]) => (
+                <div key={k} className="flex justify-between gap-4 py-2 first:pt-0">
+                  <dt className="text-muted-foreground">{k}</dt>
+                  <dd className="num text-right">{v}</dd>
+                </div>
+              ))}
+            </dl>
+            <p className="text-[12px] text-muted-foreground">
+              The physics model is fitted to your logged days over the last 90 days (least squares on daily energy) and
+              re-fitted with every new reading.
+            </p>
+          </CardContent>
+        </Card>
       </div>
 
-      {/* Recommendation / onboarding */}
-      {sizing ? (
-        <Card className="border-emerald-500/30 bg-gradient-to-r from-emerald-950/30 via-emerald-900/10 to-transparent">
-          <CardContent className="p-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-            <div className="flex items-start gap-3">
-              <div className="h-10 w-10 rounded-xl bg-emerald-500/20 text-emerald-500 flex items-center justify-center shrink-0 border border-emerald-500/30">
-                <Sparkles className="h-5 w-5" />
-              </div>
-              <div>
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="font-bold text-sm text-foreground">
-                    Recommendation: {sizing.recommendedCapacityKw} kW System
-                  </span>
-                  <Badge variant="outline" className="text-[10px] bg-emerald-50 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
-                    PM Surya Ghar Subsidy: ₹{sizing.subsidyAmountInr.toLocaleString('en-IN')}
-                  </Badge>
-                </div>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  Based on your {monthlyUnits} kWh/month {overview.hasConsumptionData ? 'billing history' : 'profile'}, this saves ~₹
-                  {sizing.estimatedAnnualSavingsInr.toLocaleString('en-IN')}/yr with a payback of {sizing.paybackPeriodYears} years.
-                </p>
-              </div>
+      <div className="grid gap-6 lg:grid-cols-3">
+        <Card className="lg:col-span-2">
+          <CardHeader>
+            <div>
+              <CardTitle>Last 30 days</CardTitle>
+              <CardDescription>Your logged generation against the model for the same weather.</CardDescription>
             </div>
-            <Link href="/analysis">
-              <Button size="sm" variant="secondary" className="text-xs gap-1 shrink-0 h-8 font-medium">
-                <span>View Full Proposal</span>
-                <ArrowRight className="h-3 w-3" />
-              </Button>
+            <Legend
+              items={[
+                { label: 'Logged', color: 'var(--chart-2)' },
+                { label: 'Modelled', color: 'var(--chart-1)', shape: 'line' },
+              ]}
+            />
+          </CardHeader>
+          <CardContent>
+            {o.daily.length ? (
+              <DailyEnergyChart data={o.daily} />
+            ) : (
+              <EmptyState title="No history yet">Log daily readings or connect a device to build this chart.</EmptyState>
+            )}
+          </CardContent>
+        </Card>
+
+        <GridExchangeCard grid={o.grid} billEstimate={o.billEstimate} loadCheck={o.loadCheck} />
+      </div>
+
+      {sizing && (
+        <Card>
+          <CardHeader>
+            <div>
+              <CardTitle>Recommendation</CardTitle>
+              <CardDescription>
+                Sized from {o.hasConsumptionData ? 'your billing history' : 'your profile'} at{' '}
+                {fmtNum(o.stats.averageMonthlyConsumption ?? profile?.monthlyUnitsKwh ?? 0)} kWh a month.
+              </CardDescription>
+            </div>
+            <Button asChild variant="ghost" size="sm">
+              <Link href="/analysis">
+                Open planner <ArrowRight />
+              </Link>
+            </Button>
+          </CardHeader>
+          <CardContent>
+            <div className="grid gap-px overflow-hidden rounded-md border bg-border sm:grid-cols-2 lg:grid-cols-5">
+              {[
+                ['Size', `${sizing.recommendedCapacityKw} kW`],
+                ['Covers', `${sizing.coveragePercentage}% of use`],
+                ['Net cost', fmtInr(sizing.netCostInr)],
+                ['Subsidy', fmtInr(sizing.subsidyAmountInr)],
+                ['Payback', `${sizing.paybackPeriodYears} yrs`],
+              ].map(([k, v]) => (
+                <div key={k} className="bg-card px-4 py-3">
+                  <p className="eyebrow">{k}</p>
+                  <p className="num mt-0.5 text-[17px]">{v}</p>
+                </div>
+              ))}
+            </div>
+            {!sizing.isRoofSufficient && (
+              <p className="mt-3 text-[12px] text-warning">Roof area limits this to {sizing.maximumCapacityByRoofKw} kW.</p>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      <div className="grid gap-6 md:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <CardTitle>Rules in use</CardTitle>
+            <Badge variant="outline">Sourced</Badge>
+          </CardHeader>
+          <CardContent className="space-y-3 text-[13px]">
+            <p>
+              <span className="text-muted-foreground">Tariff: </span>
+              {TARIFF_SOURCE.schedule}. Electricity duty, FSA and ToD are billed extra.
+            </p>
+            <p>
+              <span className="text-muted-foreground">Year-end surplus: </span>
+              paid at the average pooled power purchase cost, {NET_METERING_SETTLEMENT_SOURCE}.
+            </p>
+            <Link href="/knowledge" className="inline-flex items-center gap-1 text-primary hover:underline">
+              Search the regulations <ArrowRight className="size-3.5" />
             </Link>
           </CardContent>
         </Card>
-      ) : (
-        <Card className="border-amber-500/30 bg-amber-500/5">
-          <CardContent className="p-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-3">
-            <div>
-              <p className="font-bold text-sm">Add your data to get started</p>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                Enter your monthly units in your solar profile or add electricity bills. Nothing on this page is
-                shown until it is based on your real inputs.
-              </p>
-            </div>
-            <div className="flex gap-2">
-              <Link href="/profile"><Button size="sm" variant="secondary" className="text-xs h-8">Solar profile</Button></Link>
-              <Link href="/history"><Button size="sm" className="text-xs h-8">Add bills</Button></Link>
-            </div>
-          </CardContent>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Common questions</CardTitle>
+          </CardHeader>
+          <ul className="divide-y border-t">
+            {[
+              'How much subsidy would I get for a 3 kW system?',
+              'What is the TSSPDCL approval procedure for net metering?',
+              'What is the difference between net and gross metering?',
+            ].map((q) => (
+              <li key={q}>
+                <AskButton
+                  question={q}
+                  variant="ghost"
+                  icon={false}
+                  className="h-auto w-full justify-between rounded-none px-5 py-3 text-left font-normal whitespace-normal"
+                >
+                  <span>{q}</span>
+                  <ArrowRight className="text-muted-foreground" />
+                </AskButton>
+              </li>
+            ))}
+          </ul>
         </Card>
-      )}
-
-      {!overview.weather.available && basis && (
-        <p role="alert" className="text-xs text-amber-600">
-          Live weather is unavailable right now{overview.weather.error ? ` (${overview.weather.error})` : ''}; modelled output is hidden rather than guessed.
-        </p>
-      )}
-
-      {/* Primary KPI Metrics */}
-      <AnimatedContainer className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <AnimatedCard>
-          <Card className="hover:border-emerald-500/40 transition-colors">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-xs text-muted-foreground font-medium flex items-center justify-between">
-                <span>Estimated Power Now</span>
-                <Zap className="h-4 w-4 text-amber-500" />
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-black text-foreground">
-                {today.currentKw != null ? today.currentKw.toFixed(2) : '—'} <span className="text-sm font-normal text-muted-foreground">kW</span>
-              </div>
-              <span className="text-xs text-emerald-600 font-medium mt-1 block">
-                {basis ? `Modelled · ${basis.capacityKw} kW (${basis.kind})` : "Needs system size"}
-              </span>
-            </CardContent>
-          </Card>
-        </AnimatedCard>
-
-        <AnimatedCard>
-          <Card className="hover:border-emerald-500/40 transition-colors">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-xs text-muted-foreground font-medium flex items-center justify-between">
-                <span>Today&apos;s Generation</span>
-                <Sun className="h-4 w-4 text-amber-500" />
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-black text-foreground">
-                {todayKwh != null ? todayKwh.toFixed(2) : '—'} <span className="text-sm font-normal text-muted-foreground">kWh</span>
-              </div>
-              <span className="text-xs text-muted-foreground mt-1 block">
-                {todayKwh != null ? estimateTag : 'No data yet'}
-              </span>
-            </CardContent>
-          </Card>
-        </AnimatedCard>
-
-        <AnimatedCard>
-          <Card className="hover:border-emerald-500/40 transition-colors">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-xs text-muted-foreground font-medium flex items-center justify-between">
-                <span>Money Saved Today</span>
-                <IndianRupee className="h-4 w-4 text-emerald-600" />
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-black text-emerald-600 dark:text-emerald-400">
-                ₹{todaySaved != null ? todaySaved.toFixed(2) : '—'}
-              </div>
-              <span className="text-xs text-muted-foreground mt-1 block">
-                {tariffInrPerKwh != null ? `@ ₹${tariffInrPerKwh}/kWh` : 'Add a bill for tariff'}
-              </span>
-            </CardContent>
-          </Card>
-        </AnimatedCard>
-
-        <AnimatedCard>
-          <Card className="hover:border-emerald-500/40 transition-colors">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-xs text-muted-foreground font-medium flex items-center justify-between">
-                <span>Projected CO₂ avoided / yr</span>
-                <Leaf className="h-4 w-4 text-emerald-600" />
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-black text-foreground">
-                {sizing ? sizing.annualCo2AvoidedKg.toLocaleString('en-IN') : '—'} <span className="text-sm font-normal text-muted-foreground">kg CO2</span>
-              </div>
-              <span className="text-xs text-emerald-600 font-medium mt-1 block">
-                {sizing ? `≈ ${sizing.treesEquivalentPlanted} trees (0.82 kg/kWh grid factor)` : 'Needs consumption data'}
-              </span>
-            </CardContent>
-          </Card>
-        </AnimatedCard>
-      </AnimatedContainer>
-
-      {/* Telemetry Chart & Grid Activity */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2">
-          <OutputChart data={today.hourly} />
-        </div>
-
-        <div className="space-y-4">
-          <GridExchangeCard grid={overview.grid} billEstimate={overview.billEstimate} loadCheck={overview.loadCheck} />
-
-          {/* Quick Knowledge Highlights */}
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-bold flex items-center gap-2">
-                <BookOpen className="h-4 w-4 text-amber-500" />
-                <span>Telangana Solar Rules</span>
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3 text-xs">
-              <div className="p-2.5 rounded-lg bg-muted/40 space-y-1">
-                <span className="font-semibold text-foreground">Tariff in use:</span>
-                <p className="text-muted-foreground">
-                  {TARIFF_SOURCE.schedule}. Electricity duty, FSA and ToD adjustments are billed extra.
-                </p>
-              </div>
-
-              <div className="p-2.5 rounded-lg bg-muted/40 space-y-1">
-                <span className="font-semibold text-foreground">Annual Settlement:</span>
-                <p className="text-muted-foreground">
-                  Surplus left on 31 March is paid at the average pooled power purchase cost:{' '}
-                  {NET_METERING_SETTLEMENT_SOURCE}.
-                </p>
-              </div>
-
-              <Link href="/knowledge">
-                <Button variant="ghost" size="sm" className="w-full text-xs gap-1 mt-1">
-                  <span>Open Knowledge Bench</span>
-                  <ArrowRight className="h-3 w-3" />
-                </Button>
-              </Link>
-            </CardContent>
-          </Card>
-
-          {/* Quick Agent Query Box */}
-          <Card className="border-amber-500/20 bg-amber-500/5">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-xs font-bold flex items-center gap-2">
-                <Sparkles className="h-3.5 w-3.5 text-amber-600" />
-                <span>Instant Consultation Questions</span>
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-1.5 text-xs">
-              <Link
-                href="/chat?q=How+much+subsidy+do+I+get+for+a+3kW+system+in+Hyderabad"
-                className="block p-2 rounded hover:bg-background/80 transition-colors text-foreground font-medium"
-              >
-                → How much subsidy for 3 kW in Hyderabad?
-              </Link>
-              <Link
-                href="/chat?q=What+is+the+step-by-step+TSSPDCL+approval+procedure"
-                className="block p-2 rounded hover:bg-background/80 transition-colors text-foreground font-medium"
-              >
-                → What is the TSSPDCL approval procedure?
-              </Link>
-              <Link
-                href="/chat?q=What+is+the+difference+between+net+metering+and+gross+metering"
-                className="block p-2 rounded hover:bg-background/80 transition-colors text-foreground font-medium"
-              >
-                → What is net vs gross metering?
-              </Link>
-            </CardContent>
-          </Card>
-        </div>
       </div>
-    </PageWrapper>
+    </Page>
   )
 }

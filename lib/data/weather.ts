@@ -140,7 +140,7 @@ export type MonthlyClimate = { month: number; ghiKwhM2Day: number; tempC: number
 /** Multi-year monthly GHI (kWh/m²/day) and mean temperature from the ERA5 archive. */
 export async function getMonthlyClimatology(
   coords: Coordinates,
-  years = 3
+  years = 10
 ): Promise<MonthlyClimate[]> {
   const endYear = new Date().getUTCFullYear() - 1
   const startYear = endYear - years + 1
